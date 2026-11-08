@@ -4,13 +4,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    database_url: str = "postgresql+psycopg://plm:plm@localhost:5432/plm"
-    jwt_secret: str = "dev-secret-change-me"
-    jwt_algorithm: str = "HS256"
-    access_token_minutes: int = 30
-    upload_dir: str = "uploads"
+    DATABASE_URL: str = "postgresql+psycopg://plm:plm@localhost:5432/plm"
+    JWT_SECRET: str = "dev-secret-change-me"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_MINUTES: int = 30
+    BOOTSTRAP_ADMIN_EMAIL: str = "admin@example.com"
+    BOOTSTRAP_ADMIN_PASSWORD: str = "admin"
+    STORAGE_DIR: str = "./data/files"
+    CONFIRMATION_TTL_HOURS: int = 24
 
 
 @lru_cache

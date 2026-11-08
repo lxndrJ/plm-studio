@@ -29,8 +29,8 @@ Blueprint und Milestones M0-M7: siehe README.md und docs/.
 6. Schreibende API-Operationen sind Proposed-Writes mit
    Confirmation-Token (siehe app/guardrails/confirmations.py).
 
-## Naechster Meilenstein (M2)
+## Naechster Meilenstein (M4)
 
-Revisionen-Endpoint (POST /parts/{pn}/revisions), Transition-Endpoint
-(POST /revisions/{id}/transition) mit Rechtepruefung gegen
-workflow_transitions, Search/Filter fuer GET /parts.
+Dokumente + Preview-Pipeline (M4); danach ECR/ECO-Endpunkte (M5),
+Report-Engine (M6), KI-Layer (M7). M1-M3 sind implementiert inkl. Tests
+(backend/tests, laufend auf SQLite).

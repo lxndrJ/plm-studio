@@ -1,30 +1,57 @@
-from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
+import secrets
+from datetime import UTC, datetime, timedelta
 
 import jwt
-from passlib.context import CryptContext
 
 from app.core.config import get_settings
 
-_pwd = CryptContext(schemes=["argon2"], deprecated="auto")
-
-SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000001"
+PBKDF2_ITERATIONS = 600_000
 
 
 def hash_password(password: str) -> str:
-    return _pwd.hash(password)
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), PBKDF2_ITERATIONS)
+    return f"pbkdf2_sha256${PBKDF2_ITERATIONS}${salt}${digest.hex()}"
 
 
-def verify_password(password: str, password_hash: str) -> bool:
-    return _pwd.verify(password, password_hash)
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        algo, iterations, salt, digest = stored.split("$")
+        if algo != "pbkdf2_sha256":
+            return False
+        candidate = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), int(iterations))
+        return hmac.compare_digest(candidate.hex(), digest)
+    except (ValueError, AttributeError):
+        return False
 
 
 def create_access_token(subject: str, role: str) -> str:
     settings = get_settings()
-    now = datetime.now(timezone.utc)
-    claims = {
+    now = datetime.now(UTC)
+    payload = {
         "sub": subject,
         "role": role,
         "iat": now,
-        "exp": now + timedelta(minutes=settings.access_token_minutes),
+        "exp": now + timedelta(minutes=settings.JWT_ACCESS_MINUTES),
+        "type": "access",
     }
-    return jwt.encode(claims, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+
+
+def create_refresh_token(subject: str) -> str:
+    settings = get_settings()
+    now = datetime.now(UTC)
+    payload = {
+        "sub": subject,
+        "iat": now,
+        "exp": now + timedelta(days=30),
+        "type": "refresh",
+    }
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+
+
+def decode_token(token: str) -> dict:
+    settings = get_settings()
+    return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])

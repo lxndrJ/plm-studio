@@ -1,96 +1,85 @@
-from uuid import UUID
+import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import JSONResponse
+from sqlalchemy import select
 
-from app.api.deps import get_session
-from app.core.security import SYSTEM_USER_ID
-from app.models import AuditLog, NumberRange, Part, PartClass, PartRevision
-from app.schemas.part import PartCreate, PartRead
-from app.services.numbering import next_number
+from app.core.deps import CurrentUser, DbSession
+from app.core.errors import NotFoundError
+from app.guardrails import confirmations as conf_guard
+from app.guardrails.permissions import require_editor
+from app.models.numbering import PartClass
+from app.models.user import User
+from app.schemas.confirmation import ConfirmationProposed
+from app.schemas.part import PartCreate, PartResponse, PartSummary
+from app.services import part_service
 
-router = APIRouter(prefix="/api/v1/parts")
+router = APIRouter(prefix="/parts", tags=["parts"])
 
 
-@router.get("")
+@router.get("", response_model=list[PartSummary])
 def list_parts(
-    query: str | None = None,
-    session: Session = Depends(get_session),
-) -> list[dict[str, str]]:
-    stmt = select(Part)
-    if query:
-        like = f"%{query.lower()}%"
-        stmt = stmt.where(func.lower(Part.name).like(like))
-    parts = session.execute(stmt.limit(50)).scalars().all()
-    return [
-        {"part_number": p.part_number, "name": p.name, "part_type": p.part_type}
-        for p in parts
-    ]
+    db: DbSession,
+    user: CurrentUser,
+    query: Annotated[str | None, Query()] = None,
+    class_code: Annotated[str | None, Query()] = None,
+):
+    return part_service.search_parts(db, query=query, class_code=class_code)
 
 
-@router.post("", status_code=201, response_model=PartRead)
+@router.post("", status_code=201)
 def create_part(
-    payload: PartCreate, session: Session = Depends(get_session)
-) -> PartRead:
-    # Regel: Klassifizierung ist Pflicht
-    part_class = session.execute(
-        select(PartClass).where(PartClass.code == payload.class_code)
-    ).scalar_one_or_none()
-    if part_class is None:
-        raise HTTPException(404, f"unbekannte Klasse: {payload.class_code}")
-
-    # Regel: Duplikatpruefung vor dem Anlegen (409 = Stopp-Signal)
-    duplicates = (
-        session.execute(
-            select(Part).where(func.lower(Part.name) == payload.name.lower())
-        )
-        .scalars()
-        .all()
+    body: PartCreate,
+    db: DbSession,
+    user: Annotated[User, Depends(require_editor)],
+    direct: Annotated[bool, Query(description="true = commit immediately (UI path); false = propose confirmation token (agent path)")] = False,
+):
+    payload = body.model_dump()
+    summary = f"create part '{body.name}' (type={body.part_type}, class={body.class_code})"
+    if not direct:
+        conf = conf_guard.propose(db, user=user, action="create_part", payload=payload, summary=summary)
+        return JSONResponse(status_code=202, content=ConfirmationProposed(confirmation_id=conf.id, summary=summary).model_dump(mode="json"))
+    class_id = db.execute(select(PartClass.id).where(PartClass.code == body.class_code)).scalar_one_or_none()
+    if class_id is None:
+        raise NotFoundError(f"part class '{body.class_code}' not found", code="class_not_found")
+    part = part_service.create_part(
+        db,
+        user=user,
+        name=body.name,
+        description=body.description,
+        part_type=body.part_type,
+        class_id=class_id,
+        attributes=body.attributes,
+        reason=body.reason,
     )
-    if duplicates:
-        hits = ", ".join(d.part_number for d in duplicates)
-        raise HTTPException(409, f"moeglicherweise existierende Artikel: {hits}")
+    return PartResponse.model_validate(part)
 
-    # Nummer kommt ausschliesslich vom Generator
-    part_number = next_number(session, "ASM-" if payload.part_type == "assembly" else "P-")
 
-    part = Part(
-        part_number=part_number,
-        name=payload.name,
-        description=payload.description,
-        part_type=payload.part_type,
-        class_id=part_class.id,
-        attributes=payload.attributes,
+@router.get("/{part_number}", response_model=PartResponse)
+def get_part(part_number: str, db: DbSession, user: CurrentUser):
+    part = part_service.get_part_with_revisions(db, part_number)
+    return PartResponse.model_validate(part)
+
+
+@router.put("/{part_number}/revisions/{revision_id}", status_code=409)
+def update_revision_blocked(part_number: str, revision_id: uuid.UUID, user: Annotated[User, Depends(require_editor)]):
+    from app.core.errors import ConflictError
+
+    raise ConflictError(
+        "direct updates of revisions are not allowed; use POST /revisions/{id}/transition or create a new revision",
+        code="direct_update_not_allowed",
     )
-    session.add(part)
-    session.flush()
 
-    revision = PartRevision(
-        part_id=part.id,
-        revision="01",
-        status="draft",
-        change_reason=payload.reason or "Neuanlage",
-        created_by=UUID(SYSTEM_USER_ID),
-    )
-    session.add(revision)
 
-    session.add(
-        AuditLog(
-            entity_type="part",
-            entity_id=part.id,
-            action="create",
-            new_values={"part_number": part_number, "revision": "01"},
-            reason=payload.reason or "Neuanlage Artikel",
-            user_id=UUID(SYSTEM_USER_ID),
-        )
-    )
-    session.commit()
+@router.get("/{part_number}/revisions", response_model=list)
+def list_revisions(part_number: str, db: DbSession, user: CurrentUser):
+    from app.models.part import PartRevision
 
-    return PartRead(
-        part_number=part_number,
-        name=part.name,
-        revision="01",
-        status="draft",
-        class_code=part_class.code,
-    )
+    part = part_service.get_part_with_revisions(db, part_number)
+    revs = db.execute(
+        select(PartRevision).where(PartRevision.part_id == part.id).order_by(PartRevision.revision)
+    ).scalars()
+    from app.schemas.part import RevisionResponse
+
+    return [RevisionResponse.model_validate(r) for r in revs]

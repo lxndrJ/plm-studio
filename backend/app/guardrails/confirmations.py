@@ -1,46 +1,125 @@
+"""Confirmation-token flow for proposed writes (agent path).
+
+A mutating endpoint called without `direct=true` does not write; it stores a
+Confirmation (status='proposed') and returns 202 + confirmation_id + summary.
+The user approves via POST /api/v1/confirmations/{id}/approve, which
+re-validates the payload with its Pydantic schema and re-checks the caller's
+role before dispatching to the service function."""
+
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from typing import Any
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-
-@dataclass
-class ProposedOperation:
-    summary: str
-    payload: dict[str, Any]
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-    @property
-    def id(self) -> str:
-        return str(uuid.uuid5(uuid.NAMESPACE_URL, f"plm/{self.summary}"))
-
-    @property
-    def is_expired(self) -> bool:
-        return datetime.now(timezone.utc) > self.created_at + timedelta(minutes=10)
+from app.core.config import get_settings
+from app.core.errors import ConflictError, NotFoundError, ValidationError
+from app.models.confirmation import Confirmation
+from app.models.user import User
+from app.schemas.confirmation import payload_for_action
+from app.services import part_service
+from app.services.bom_service import (
+    add_bom_item,
+    get_part_by_number,
+    get_revision_or_404,
+    resolve_component_revision,
+)
 
 
-class ConfirmationStore:
-    """In-Memory-Store fuer Proposed-Writes (Phase M7: persistente Variante).
-
-    Flow: propose() -> 202 + confirmation_id an den Client ->
-    User bestaetigt im Frontend -> confirm() fuehrt die Operation aus.
-    """
-
-    def __init__(self) -> None:
-        self._store: dict[str, ProposedOperation] = {}
-
-    def propose(self, summary: str, payload: dict[str, Any]) -> str:
-        op = ProposedOperation(summary=summary, payload=payload)
-        self._store[op.id] = op
-        return op.id
-
-    def confirm(self, confirmation_id: str) -> dict[str, Any]:
-        op = self._store.get(confirmation_id)
-        if op is None or op.is_expired:
-            raise KeyError("Confirmation unbekannt oder abgelaufen")
-        del self._store[confirmation_id]
-        return op.payload
+def propose(db: Session, *, user: User, action: str, payload: dict, summary: str) -> Confirmation:
+    settings = get_settings()
+    conf = Confirmation(
+        action=action,
+        summary=summary,
+        payload=payload,
+        status="proposed",
+        created_by=user.id,
+        expires_at=datetime.now(UTC) + timedelta(hours=settings.CONFIRMATION_TTL_HOURS),
+    )
+    db.add(conf)
+    db.commit()
+    db.refresh(conf)
+    return conf
 
 
-store = ConfirmationStore()
+def _as_utc(dt: datetime) -> datetime:
+    # SQLite returns naive datetimes for DateTime(timezone=True); treat as UTC
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+
+
+def get_confirmation(db: Session, confirmation_id: uuid.UUID) -> Confirmation:
+    conf = db.get(Confirmation, confirmation_id)
+    if conf is None:
+        raise NotFoundError(f"confirmation {confirmation_id} not found", code="confirmation_not_found")
+    return conf
+
+
+def _execute(db: Session, user: User, conf: Confirmation) -> dict:
+    schema_cls = payload_for_action(conf.action)
+    payload = schema_cls.model_validate(conf.payload)
+    if conf.action == "create_part":
+        from app.models.numbering import PartClass
+
+        class_id = db.execute(select(PartClass.id).where(PartClass.code == payload.class_code)).scalar_one_or_none()
+        if class_id is None:
+            raise NotFoundError(f"part class '{payload.class_code}' not found", code="class_not_found")
+        part = part_service.create_part(
+            db,
+            user=user,
+            name=payload.name,
+            part_type=payload.part_type,
+            class_id=class_id,
+            description=payload.description,
+            attributes=payload.attributes,
+            reason=payload.reason,
+        )
+        return {"part_number": part.part_number}
+    if conf.action == "create_revision":
+        part = get_part_by_number(db, payload.part_number)
+        rev = part_service.create_revision(db, user=user, part=part, change_reason=payload.change_reason)
+        return {"part_number": part.part_number, "revision": rev.revision}
+    if conf.action == "transition_revision":
+        rev = get_revision_or_404(db, uuid.UUID(payload.revision_id))
+        rev = part_service.transition_revision(
+            db, user=user, revision=rev, to_status=payload.to_status, reason=payload.reason
+        )
+        return {"revision_id": str(rev.id), "status": rev.status}
+    if conf.action == "add_bom_item":
+        parent_rev = get_revision_or_404(db, uuid.UUID(payload.parent_rev_id))
+        component_rev = resolve_component_revision(db, payload.component_part_number, payload.component_revision)
+        item = add_bom_item(
+            db,
+            parent_rev=parent_rev,
+            component_rev=component_rev,
+            quantity=payload.quantity,
+            unit=payload.unit,
+            position=payload.position,
+        )
+        db.commit()
+        return {"bom_item_id": str(item.id)}
+    raise ValidationError(f"unknown confirmation action '{conf.action}'", code="unknown_action")
+
+
+def resolve(db: Session, *, user: User, confirmation_id: uuid.UUID, approve: bool) -> Confirmation:
+    conf = get_confirmation(db, confirmation_id)
+    if conf.status != "proposed":
+        raise ConflictError(f"confirmation is already '{conf.status}'", code="confirmation_resolved")
+    if _as_utc(conf.expires_at) < datetime.now(UTC):
+        conf.status = "expired"
+        db.commit()
+        raise ConflictError("confirmation expired", code="confirmation_expired")
+    if not approve:
+        conf.status = "rejected"
+        conf.resolved_by = user.id
+        conf.resolved_at = datetime.now(UTC)
+        db.commit()
+        db.refresh(conf)
+        return conf
+    result = _execute(db, user, conf)
+    conf.status = "executed"
+    conf.resolved_by = user.id
+    conf.resolved_at = datetime.now(UTC)
+    conf.payload = {**conf.payload, "_result": result}
+    db.commit()
+    db.refresh(conf)
+    return conf

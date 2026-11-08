@@ -1,25 +1,30 @@
 import uuid
 from datetime import datetime
-from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import BigInteger, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
+from app.models.base import Base, now_ts
+from app.models.numbering import JsonB
 
 
 class AuditLog(Base):
+    """Append-only. No UPDATE/DELETE grants are ever given out for this table;
+    the API exposes no mutating endpoints for it."""
+
     __tablename__ = "audit_log"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    entity_type: Mapped[str] = mapped_column(String)
-    entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
-    action: Mapped[str] = mapped_column(String)
-    old_values: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
-    new_values: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
-    reason: Mapped[str | None] = mapped_column(String, nullable=True)
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
-    at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+    # bigserial on Postgres; plain INTEGER (rowid alias) on SQLite so autoincrement works there too
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer(), "sqlite"), primary_key=True, autoincrement=True
     )
+    entity_type: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    entity_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    old_values: Mapped[dict | None] = mapped_column(JsonB, nullable=True)
+    new_values: Mapped[dict | None] = mapped_column(JsonB, nullable=True)
+    reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    at: Mapped[datetime] = now_ts()
+
+    user = relationship("User", back_populates="audit_entries")

@@ -3,6 +3,7 @@ import uuid
 
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
 
 DB_URL = os.environ.get("TEST_DATABASE_URL")
 
@@ -36,15 +37,20 @@ def test_released_revision_is_immutable() -> None:
             {"pid": part_id},
         ).scalar_one()
 
-    with pytest.raises(Exception, match="immutable"):
-        with engine.begin() as conn:
-            conn.execute(
-                text("UPDATE part_revisions SET change_reason = 'hack' WHERE id = :rid"),
-                {"rid": rev_id},
-            )
+    with pytest.raises(Exception, match="immutable"), engine.begin() as conn:
+        conn.execute(
+            text("UPDATE part_revisions SET change_reason = 'hack' WHERE id = :rid"),
+            {"rid": rev_id},
+        )
 
-    with engine.begin() as conn:
-        conn.execute(text("DELETE FROM parts WHERE id = :pid"), {"pid": part_id})
+    # cleanup is best-effort: a released revision is immutable (trigger blocks
+    # its DELETE) and the FK from part_revisions blocks deleting the part, so
+    # on Postgres the row simply stays in the throwaway test DB
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM parts WHERE id = :pid"), {"pid": part_id})
+    except SQLAlchemyError:
+        pass
 
 
 def test_workflow_transition_matrix_enforced() -> None:
