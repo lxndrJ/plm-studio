@@ -6,6 +6,7 @@ from app.models.confirmation import Confirmation
 from app.models.document import DocFile, DocLink, DocRevision, Document
 from app.models.numbering import NumberRange, PartClass
 from app.models.part import Part, PartRevision
+from app.models.preview import PreviewJob
 from app.models.report import ReportExport
 from app.models.user import User
 from app.models.workflow import WorkflowTransition
@@ -25,6 +26,7 @@ __all__ = [
     "Part",
     "PartClass",
     "PartRevision",
+    "PreviewJob",
     "ReportExport",
     "User",
     "WorkflowTransition",

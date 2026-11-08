@@ -27,8 +27,8 @@ Blueprint and milestones M0-M7: see README.md and docs/.
 6. Write API operations are proposed writes with a confirmation token
    (see app/guardrails/confirmations.py).
 
-## Next milestone (M4)
+## Next milestone (M5)
 
-Documents + preview pipeline (M4); then ECR/ECO endpoints (M5),
-report engine (M6), AI layer (M7). M1-M3 are implemented incl. tests
+ECR/ECO endpoints (models + workflow matrix already in place); then report
+engine (M6), AI layer (M7). M1-M4 are implemented incl. tests
 (backend/tests, running on SQLite).

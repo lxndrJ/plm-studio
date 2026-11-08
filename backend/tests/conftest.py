@@ -5,6 +5,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///" + os.path.join(tempfile.mkdte
 os.environ.setdefault("JWT_SECRET", "test-secret")
 os.environ.setdefault("BOOTSTRAP_ADMIN_EMAIL", "admin@example.com")
 os.environ.setdefault("BOOTSTRAP_ADMIN_PASSWORD", "admin-pw")
+os.environ.setdefault("STORAGE_DIR", tempfile.mkdtemp(prefix="plm-storage-"))
 
 import pytest
 from fastapi.testclient import TestClient

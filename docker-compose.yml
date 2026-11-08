@@ -36,9 +36,19 @@ services:
     restart: unless-stopped
 
   previews:
-    build: ./previews
+    build:
+      context: .
+      dockerfile: previews/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-plm}:${DB_PASSWORD}@db:5432/${POSTGRES_DB:-plm}
+      STORAGE_DIR: /data/files
+    volumes:
+      - filedata:/data/files
     depends_on:
-      - api
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
     restart: unless-stopped
 
   litellm:

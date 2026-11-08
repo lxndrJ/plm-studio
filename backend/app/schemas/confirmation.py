@@ -33,11 +33,38 @@ class AddBomItemPayload(BaseModel):
     position: int = Field(ge=1)
 
 
+class CreateDocumentPayload(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    doc_type: str = Field(pattern="^(vector|raster|cad|report|other)$")
+    reason: str | None = None
+
+
+class CreateDocRevisionPayload(BaseModel):
+    doc_number: str
+    change_reason: str = Field(min_length=1)
+
+
+class LinkDocumentPayload(BaseModel):
+    doc_number: str
+    part_number: str
+    link_type: str = Field(pattern="^(referenced-by|owned-by)$")
+
+
+class TransitionDocRevisionPayload(BaseModel):
+    revision_id: str
+    to_status: str = Field(pattern="^(draft|review|released|obsolete)$")
+    reason: str = Field(min_length=1)
+
+
 ACTION_SCHEMAS = {
     "create_part": CreatePartPayload,
     "create_revision": CreateRevisionPayload,
     "transition_revision": TransitionPayload,
     "add_bom_item": AddBomItemPayload,
+    "create_document": CreateDocumentPayload,
+    "create_doc_revision": CreateDocRevisionPayload,
+    "link_document": LinkDocumentPayload,
+    "transition_doc_revision": TransitionDocRevisionPayload,
 }
 
 
@@ -49,7 +76,16 @@ def payload_for_action(action: str):
     return ACTION_SCHEMAS[action]
 
 
-ConfirmationPayload = CreatePartPayload | CreateRevisionPayload | TransitionPayload | AddBomItemPayload
+ConfirmationPayload = (
+    CreatePartPayload
+    | CreateRevisionPayload
+    | TransitionPayload
+    | AddBomItemPayload
+    | CreateDocumentPayload
+    | CreateDocRevisionPayload
+    | LinkDocumentPayload
+    | TransitionDocRevisionPayload
+)
 
 
 class ConfirmationResponse(BaseModel):
