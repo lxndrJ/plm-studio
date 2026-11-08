@@ -3,7 +3,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.deps import DbSession
-from app.core.errors import ConflictError
+from app.core.errors import ConflictError, NotFoundError
 from app.guardrails.permissions import require_admin
 from app.models.audit import AuditLog
 from app.models.confirmation import Confirmation
@@ -56,7 +56,24 @@ def list_part_classes(db: DbSession):
 def create_part_class(body: PartClassCreate, db: DbSession):
     if db.execute(select(PartClass).where(PartClass.code == body.code)).scalar_one_or_none():
         raise ConflictError(f"part class '{body.code}' already exists", code="class_exists")
-    cls = PartClass(code=body.code, name=body.name, default_attributes=body.default_attributes)
+    parent_id = None
+    if body.parent_code is not None:
+        parent = db.execute(
+            select(PartClass).where(PartClass.code == body.parent_code)
+        ).scalar_one_or_none()
+        if parent is None:
+            raise NotFoundError(
+                f"parent part class '{body.parent_code}' not found", code="class_not_found"
+            )
+        # A newly created class has no children, so it can never close a
+        # cycle; no re-parenting endpoint exists (ADR 0002).
+        parent_id = parent.id
+    cls = PartClass(
+        code=body.code,
+        name=body.name,
+        default_attributes=body.default_attributes,
+        parent_id=parent_id,
+    )
     db.add(cls)
     db.commit()
     db.refresh(cls)

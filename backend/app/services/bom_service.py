@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from sqlalchemy import Integer, Select, cast, select
 from sqlalchemy.orm import Session
 
@@ -6,6 +8,15 @@ from app.models.bom import BomItem
 from app.models.part import Part, PartRevision
 
 ALLOWED_COMPONENT_STATUSES = ("draft", "released")
+
+
+def assert_valid_unit(db: Session, unit: str) -> None:
+    """BOM units must exist in the units master data (ADR 0002)."""
+    from app.models.units import Unit
+
+    exists = db.execute(select(Unit.code).where(Unit.code == unit)).scalar_one_or_none()
+    if exists is None:
+        raise ValidationError(f"unit '{unit}' is not in the units master data", code="unknown_unit")
 
 
 def get_revision_or_404(db: Session, revision_id) -> PartRevision:
@@ -77,10 +88,11 @@ def add_bom_item(
         )
     if parent_rev.id == component_rev.id:
         raise ValidationError("a revision cannot be its own component", code="bom_self_reference")
+    assert_valid_unit(db, unit)
     item = BomItem(
         parent_rev_id=parent_rev.id,
         component_rev_id=component_rev.id,
-        quantity=quantity,
+        quantity=Decimal(str(quantity)),
         unit=unit,
         position=position,
     )

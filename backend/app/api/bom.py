@@ -146,6 +146,7 @@ def update_item(
     if quantity is not None:
         item.quantity = quantity
     if unit is not None:
+        bom_service.assert_valid_unit(db, unit)
         item.unit = unit
     if position is not None:
         item.position = position

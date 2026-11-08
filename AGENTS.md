@@ -26,6 +26,14 @@ Blueprint and milestones M0-M7: see README.md and docs/.
    reference, no DELETE on released objects.
 6. Write API operations are proposed writes with a confirmation token
    (see app/guardrails/confirmations.py).
+7. Technical attributes are revision-scoped: they live on part_revisions
+   (JSONB) and are inherited by successor revisions. parts carries only
+   neutral fields. Attribute values are validated against the typed
+   definitions in class_attributes (see docs/adr/0002-data-foundation.md).
+8. BOM units must exist in the units master data (units table); unknown
+   units are rejected with 422 unknown_unit.
+9. Part classes form a tree via part_classes.parent_id. Class filters in
+   search include the whole subtree; unknown class codes are 404.
 
 ## Next milestone (M5)
 

@@ -23,7 +23,6 @@ class Part(Base):
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     part_type: Mapped[str] = mapped_column(String, nullable=False, default="part")
     class_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("part_classes.id"), nullable=False)
-    attributes: Mapped[dict] = mapped_column(JsonB, nullable=False, default=dict)
     created_at: Mapped[datetime] = now_ts()
 
     revisions = relationship("PartRevision", back_populates="part", cascade="all, delete-orphan")
@@ -41,6 +40,7 @@ class PartRevision(Base):
     revision: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="draft")
     change_reason: Mapped[str] = mapped_column(String, nullable=False)
+    attributes: Mapped[dict] = mapped_column(JsonB, nullable=False, default=dict)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = now_ts()
 
