@@ -16,8 +16,8 @@ project document "PLM-System Blueprint". Rules for agents:
 - [x] M2 Parts, revisions, number ranges (duplicate check 409, released
       immutable via trigger + service check, audit log on every write)
 - [x] M3 BOM and where-used (recursive CTE, BOM diff added/removed/changed)
-- [ ] M4 Documents and preview pipeline (models/migration in place)
-- [ ] M5 Workflow API, ECR/ECO (matrix + models in place; part_revision transition API is live)
+- [x] M4 Documents and preview pipeline (upload/download, browser-native SVG/PDF, thumbnail/convert queue via preview_jobs + worker; originals immutable)
+- [ ] M5 ECR/ECO endpoints (matrix + models in place; part_revision/doc_revision transition APIs are live)
 - [ ] M6 Report engine (Typst)
 - [ ] M7 AI layer (LiteLLM, tools from /openapi.json, guardrails)
 
@@ -47,6 +47,7 @@ test walkthrough.
 - `POST /parts/{pn}/revisions`, `POST /revisions/{id}/transition` (matrix + role, else 422/403)
 - `GET/POST/PUT/DELETE /bom/...`, `GET /bom/parts/{pn}/where-used`, `GET /bom/parts/{pn}/diff`
 - `POST /confirmations/{id}/approve|reject`
+- `GET/POST /documents`, `POST /documents/{nr}/revisions`, `.../files` (upload), `/links`, `GET /doc-files/{id}/download|preview`, `POST /doc-revisions/{id}/transition`
 - `GET /admin/health`, `/admin/number-ranges`, `/admin/part-classes`, `/admin/audit-log` (admin)
 
 ## Core principles

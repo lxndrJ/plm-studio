@@ -84,6 +84,38 @@ def _execute(db: Session, user: User, conf: Confirmation) -> dict:
             db, user=user, revision=rev, to_status=payload.to_status, reason=payload.reason
         )
         return {"revision_id": str(rev.id), "status": rev.status}
+    if conf.action == "create_document":
+        from app.services import document_service
+
+        doc = document_service.create_document(
+            db, user=user, title=payload.title, doc_type=payload.doc_type, reason=payload.reason
+        )
+        return {"doc_number": doc.doc_number}
+    if conf.action == "create_doc_revision":
+        from app.services import document_service
+
+        doc = document_service.get_document(db, payload.doc_number)
+        rev = document_service.create_doc_revision(db, user=user, doc=doc, change_reason=payload.change_reason)
+        return {"doc_number": doc.doc_number, "revision": rev.revision}
+    if conf.action == "link_document":
+        from app.services import document_service
+
+        doc = document_service.get_document(db, payload.doc_number)
+        link = document_service.link_document(
+            db, user=user, doc=doc, part_number=payload.part_number, link_type=payload.link_type
+        )
+        return {"link_id": str(link.id)}
+    if conf.action == "transition_doc_revision":
+        from app.models.document import DocRevision
+        from app.services import document_service
+
+        rev = db.get(DocRevision, uuid.UUID(payload.revision_id))
+        if rev is None:
+            raise NotFoundError(f"doc revision {payload.revision_id} not found", code="revision_not_found")
+        rev = document_service.transition_doc_revision(
+            db, user=user, rev=rev, to_status=payload.to_status, reason=payload.reason
+        )
+        return {"revision_id": str(rev.id), "status": rev.status}
     if conf.action == "add_bom_item":
         parent_rev = get_revision_or_404(db, uuid.UUID(payload.parent_rev_id))
         component_rev = resolve_component_revision(db, payload.component_part_number, payload.component_revision)

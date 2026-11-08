@@ -22,6 +22,7 @@ Test-to-milestone mapping:
 | M1 schema/constraints | `tests/test_constraints.py` — unique `(part_id, revision)`, BOM self-reference, alembic up/down, audit log append-only |
 | M2 parts/revisions | `tests/test_parts.py`, `tests/test_revisions_workflow.py` — duplicate 409, released immutable, audit entries |
 | M3 BOM | `tests/test_bom.py` — recursive where-used over 3 levels, BOM diff added/removed/changed |
+| M4 documents/preview | `tests/test_documents.py` — upload/download byte-identical, PNG thumbnail derivative without manual step, native SVG preview, originals immutable (405), released doc rev 409 |
 | M5 preview | invalid status jump -> 422 (`test_invalid_transition_is_422`) |
 | Confirmation flow | `tests/test_confirmations.py` — 202 -> approve -> committed |
 

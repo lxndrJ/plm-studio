@@ -16,6 +16,7 @@ class Document(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
 
     revisions = relationship("DocRevision", back_populates="document", cascade="all, delete-orphan")
+    links = relationship("DocLink", cascade="all, delete-orphan")
 
 
 class DocRevision(Base):
