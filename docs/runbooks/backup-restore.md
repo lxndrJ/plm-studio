@@ -1,18 +1,18 @@
 # Runbook: Backup & Restore
 
-## Taegliches Backup (Cron, 02:30 Uhr)
+## Daily backup (cron, 02:30)
 
-    # DB-Dump
+    # DB dump
     docker compose exec -T db pg_dump -U plm plm | gzip \
       > backups/plm-$(date +%F).sql.gz
 
-    # Uploads/Originale synchronisieren
+    # sync uploads/originals
     rsync -a --delete uploads/ backup-target:plm-uploads/
 
-## Pruefung
+## Verification
 
-- Restore-Test monatlich in eine scratch-DB.
-- Backupgroesse monitoren (Wachstum = Dateivolumen im Blick behalten).
+- Restore test monthly into a scratch DB.
+- Monitor backup size (growth = keep an eye on file volume).
 
 ## Restore
 
@@ -21,4 +21,4 @@
       | docker compose exec -T db psql -U plm -d plm
     rsync -a backup-target:plm-uploads/ uploads/
     docker compose up -d api
-    # Verifikation: /health, danach Stichprobenartikel + Audit-Log pruefen
+    # verify: /health, then spot-check parts + audit log

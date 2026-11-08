@@ -1,36 +1,34 @@
-# AGENTS.md - Regeln fuer Vibe Code in diesem Repo
+# AGENTS.md - Rules for Vibe Code in this repo
 
-Projekt: PLM Studio (Eigenbau-PLM mit KI-Prompt-Layer).
+Project: PLM Studio (in-house PLM with AI prompt layer).
 Stack: FastAPI (Python 3.12) + PostgreSQL 16 + Alembic + SvelteKit.
-Blueprint und Milestones M0-M7: siehe README.md und docs/.
+Blueprint and milestones M0-M7: see README.md and docs/.
 
-## Arbeitsweise
+## Working style
 
-- TDD fuer Geschaeftsregeln: zuerst der Test (tests/), dann die
-  Implementierung. Abnahmekriterien je Meilenstein stehen im README.
-- Jede Schema-Aenderung nur ueber eine neue Alembic-Migration
-  (alembic revision), nie manuell in der DB.
-- Conventional Commits, kleine reviewbare Aenderungen.
-- Ruff (line-length 100) und pytest muessen vor jedem Commit gruen sein.
+- TDD for business rules: write the test first (tests/), then the
+  implementation. Acceptance criteria per milestone are in the README.
+- Every schema change only via a new Alembic migration (alembic revision),
+  never by hand in the DB.
+- Conventional Commits, small reviewable changes.
+- Ruff (line-length 100) and pytest must be green before every commit.
 
-## PLM-Datenregeln (kritisch, niemals verletzen)
+## PLM data rules (critical, never violate)
 
-1. Teilenummern vergibt ausschliesslich der Nummernkreis-Generator
-   (app/services/numbering.py). Niemals client-seitig Nummern setzen.
-2. Freigegebene Revisionen (status=released) sind immutable; ein
-   DB-Trigger erzwingt das. Aenderungen laufen immer ueber neue
-   Revisionen mit change_reason.
-3. Statusuebergaenge nur ueber die Matrix in workflow_transitions;
-   nie einen status direkt UPDATE'n.
-4. Jeder schreibende Vorgang erzeugt einen audit_log-Eintrag
-   (who/what/why/old/new).
-5. Kein Artikel ohne Klassifizierung, keine BOM-Position ohne
-   gueltige Artikelreferenz, kein DELETE an released Objekten.
-6. Schreibende API-Operationen sind Proposed-Writes mit
-   Confirmation-Token (siehe app/guardrails/confirmations.py).
+1. Part numbers are assigned exclusively by the number-range generator
+   (app/services/numbering.py). Never set numbers client-side.
+2. Released revisions (status=released) are immutable; a DB trigger enforces
+   it. Changes always go through new revisions with change_reason.
+3. Status transitions only via the matrix in workflow_transitions;
+   never UPDATE a status directly.
+4. Every write creates an audit_log entry (who/what/why/old/new).
+5. No part without classification, no BOM line without a valid part
+   reference, no DELETE on released objects.
+6. Write API operations are proposed writes with a confirmation token
+   (see app/guardrails/confirmations.py).
 
-## Naechster Meilenstein (M4)
+## Next milestone (M4)
 
-Dokumente + Preview-Pipeline (M4); danach ECR/ECO-Endpunkte (M5),
-Report-Engine (M6), KI-Layer (M7). M1-M3 sind implementiert inkl. Tests
-(backend/tests, laufend auf SQLite).
+Documents + preview pipeline (M4); then ECR/ECO endpoints (M5),
+report engine (M6), AI layer (M7). M1-M3 are implemented incl. tests
+(backend/tests, running on SQLite).

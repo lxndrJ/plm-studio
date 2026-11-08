@@ -1,45 +1,45 @@
-# ADR 0001: Tech-Stack fuer das Eigenbau-PLM
+# ADR 0001: Tech stack for the in-house PLM
 
-Status: akzeptiert (2026-11-08)
+Status: accepted (2026-11-08)
 
-## Kontext
+## Context
 
-Kleines Team, self-hosted auf VPS ( Raspberry Pi als Testmoeglichkeit),
-KI-Prompt-Layer als Primaer-Benutzerschnittstelle, intern Dateiverwaltung
-fuer Vector/JPEG und Report-Generierung fuer Externe.
+Small team, self-hosted on a VPS (Raspberry Pi as a test option), AI prompt
+layer as the primary interface, internal file management for vector/JPEG,
+and report generation for external parties.
 
-## Entscheidung
+## Decision
 
-PostgreSQL 16 als Datenbank, FastAPI (Python 3.12) als Backend,
-LiteLLM als OpenAI-kompatibler Modell-Proxy, SvelteKit als Frontend,
-Docker Compose als Deployment, Typst fuer Reports.
+PostgreSQL 16 as the database, FastAPI (Python 3.12) as the backend,
+LiteLLM as the OpenAI-compatible model proxy, SvelteKit as the frontend,
+Docker Compose as deployment, Typst for reports.
 
-## Begruendung
+## Rationale
 
-- PostgreSQL: relationale Integritaet fuer Teile-/BOM-Referenzen,
-  Recursive CTEs fuer Where-Used, JSONB fuer flexible Attribute.
-- FastAPI: generiert automatisch ein OpenAPI-Schema. Dieses Schema ist
-  spaeter wortwoertlich der Tool-Contract des KI-Agenten. Eine zweite,
-  abweichende Tool-Beschreibung entfaellt damit.
-- LiteLLM: Modelle (Mistral/DeepSeek/lokal) austauschbar ohne Codeaenderung,
-  Kostenkontrolle zentral.
-- Typst: PDF-Generierung ohne headless Chrome, lauffaehig auf ARM.
+- PostgreSQL: relational integrity for part/BOM references, recursive CTEs
+  for where-used, JSONB for flexible attributes.
+- FastAPI: automatically generates an OpenAPI schema. This schema is later
+  literally the tool contract of the AI agent, so there is no second,
+  divergent tool description.
+- LiteLLM: models (Mistral/DeepSeek/local) interchangeable without code
+  changes, cost control centralized.
+- Typst: PDF generation without headless Chrome, runs on ARM.
 
-## Alternativen (verworfen)
+## Alternatives (rejected)
 
-- Wrapper um Aras/OpenPLM: Agent-Layer statt Kern bedeutet, dass die
-  Datenintegraetsregeln (Immutability, Workflow) vom Fremdsystem abhaengen;
-  fuer ein kleines Team unnoetige Betriebslast. Entscheidung fiel bewusst
-  fuer Kompletteigenbau.
-- Node/NestJS Backend: gleichfaehig, aber Python-Oekosystem fuer CAD/Material
-  (OCC, stepler, pandas) passt besser in ein PLM-Umfeld.
-- MongoDB: referentielle Integritaet (keine BOM-Position ohne gueltige
-  Artikelreferenz) ist eine Kernanforderung, relationale DB erzwingt sie.
-- Keycloak: fuer ein kleines Team ueberdimensioniert; JWT reicht.
+- Wrapper around Aras/OpenPLM: an agent layer on top of the core means the
+  data integrity rules (immutability, workflow) depend on the external
+  system; unnecessary operational overhead for a small team. Deliberately
+  chose full in-house build.
+- Node/NestJS backend: equally capable, but the Python ecosystem for
+  CAD/materials (OCC, stepler, pandas) fits a PLM environment better.
+- MongoDB: referential integrity (no BOM line without a valid part
+  reference) is a core requirement; a relational DB enforces it.
+- Keycloak: overkill for a small team; JWT is enough.
 
-## Konsequenzen
+## Consequences
 
-- Alle Geschaefzregeln muessen selbst implementiert und getestet werden
-  (Migrationspflicht fuer jede Regel).
-- OpenAPI-Schema ist Teil des oeffentlichen Contracts: Breaking Changes
-  brauchen eine neue API-Version.
+- All business rules must be implemented and tested ourselves
+  (migration mandatory for every rule).
+- The OpenAPI schema is part of the public contract: breaking changes need
+  a new API version.
