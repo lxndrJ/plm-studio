@@ -1,16 +1,16 @@
 # Frontend (SvelteKit)
 
-Wird in M2 aufgesetzt:
+Set up in M2:
 
     npm create svelte@latest .
     npm install
     npm run dev
 
-Geplante Routen: /parts, /bom, /documents, /changes, /reports, /admin.
+Planned routes: /parts, /bom, /documents, /changes, /reports, /admin.
 
-API-Client aus OpenAPI generieren (single source of truth):
+Generate the API client from OpenAPI (single source of truth):
 
     npx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api/schema.d.ts
 
-Naechste Aufgabe: Login (JWT aus backend/app/core/security.py) und die
-Parts-Liste mit Suchfeld gegen GET /api/v1/parts.
+Next task: login (JWT from backend/app/core/security.py) and the parts
+list with search against GET /api/v1/parts.

@@ -1,8 +1,8 @@
-# Tool-Definitionen
+# Tool definitions
 
-Werden in Phase M7 automatisch aus dem OpenAPI-Schema der API generiert
-(`/openapi.json`). Kein manuelles Duplizieren von Schemas.
+Generated automatically in phase M7 from the API's OpenAPI schema
+(`/openapi.json`). No manual duplication of schemas.
 
-Geplanter Generator: agent/tools/generate_tools.py - liest openapi.json,
-mappt Endpunkte auf Function-Calling-Definitionen (JSON Schema), filtert
-auf Lese-Endpunkte + Proposed-Write-Endpunkte.
+Planned generator: agent/tools/generate_tools.py - reads openapi.json,
+maps endpoints to function-calling definitions (JSON Schema), filters to
+read endpoints + proposed-write endpoints.

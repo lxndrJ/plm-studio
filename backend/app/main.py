@@ -37,9 +37,9 @@ app = FastAPI(
     title="PLM-Studio API",
     version="0.1.0",
     description=(
-        "Eigenbau-PLM. Das OpenAPI-Schema dieser API ist zugleich der Tool-Contract "
-        "fuer den KI-Agenten (Phase 2). Schreibende Operationen ohne direct=true liefern "
-        "202 + Confirmation-Token."
+        "In-house PLM. This API's OpenAPI schema is also the tool contract "
+        "for the AI agent (phase 2). Write operations without direct=true return "
+        "202 + confirmation token."
     ),
     lifespan=lifespan,
 )

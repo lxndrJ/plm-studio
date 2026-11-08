@@ -1,16 +1,16 @@
-# Preview-Worker
+# Preview worker
 
-Queue-basierter Service, der aus Original-Dateien Derivate (Thumbnails,
-PDF/PNG-Previews) erzeugt. Originale bleiben unveraendert (immutable);
-Derivate verweisen via preview_file_id auf ihr Original.
+Queue-based service that generates derivatives (thumbnails, PDF/PNG
+previews) from original files. Originals stay unchanged (immutable);
+derivatives reference their original via preview_file_id.
 
-Geplante Phase M4:
+Planned phase M4:
 
-| Format | Preview | Werkzeug |
-|--------|---------|-----------|
-| JPG/PNG/WebP | Thumbnail + Original | libvips |
-| SVG/PDF | nativ im Browser | Content-Type |
-| AI/EPS | PNG-Derivat | Inkscape headless / Ghostscript |
-| PSD | PNG-Flat-Export | libvips (rastert Layer) |
+| Format      | Preview            | Tool                        |
+|-------------|--------------------|-----------------------------|
+| JPG/PNG/WebP| Thumbnail + original | libvips                  |
+| SVG/PDF     | native in browser  | content-type                |
+| AI/EPS      | PNG derivative     | Inkscape headless / Ghostscript |
+| PSD         | PNG flat export    | libvips (rasterizes layers) |
 
-Stack: Python-Worker (arq/Redis oder Postgres-Jobtabelle), libvips.
+Stack: Python worker (arq/Redis or Postgres job table), libvips.
