@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Node / Frontend
+node_modules/
+frontend/.svelte-kit/
+frontend/build/
+
+# Environment & Secrets
+.env
+
+# Uploads / generierte Dateien
+uploads/
+previews/out/
+
+# OS / Editor
+.DS_Store
+*.swp
+.idea/
+.vscode/

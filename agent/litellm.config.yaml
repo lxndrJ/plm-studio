@@ -1,0 +1,16 @@
+model_list:
+  - model_name: plm-chat
+    litellm_params:
+      model: openai/mistral-small-latest
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: plm-analysis
+    litellm_params:
+      model: openai/mistral-large-latest
+      api_key: os.environ/OPENAI_API_KEY
+
+litellm_settings:
+  drop_params: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
