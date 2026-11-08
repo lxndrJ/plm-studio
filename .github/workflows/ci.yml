@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "vibe/*"]
   pull_request:
 
 jobs:
@@ -30,7 +30,10 @@ jobs:
       - run: pip install -e "backend[dev]"
       - run: ruff check backend
       - name: Alembic Migration gegen frische Test-DB
-        run: alembic -c backend/alembic.ini upgrade head
+        run: |
+          alembic -c backend/alembic.ini upgrade head
+          alembic -c backend/alembic.ini downgrade base
+          alembic -c backend/alembic.ini upgrade head
         env:
           DATABASE_URL: postgresql+psycopg://plm:test@localhost:5432/plm_test
       - name: Tests

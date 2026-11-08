@@ -36,12 +36,11 @@ def test_released_revision_is_immutable() -> None:
             {"pid": part_id},
         ).scalar_one()
 
-    with pytest.raises(Exception, match="immutable"):
-        with engine.begin() as conn:
-            conn.execute(
-                text("UPDATE part_revisions SET change_reason = 'hack' WHERE id = :rid"),
-                {"rid": rev_id},
-            )
+    with pytest.raises(Exception, match="immutable"), engine.begin() as conn:
+        conn.execute(
+            text("UPDATE part_revisions SET change_reason = 'hack' WHERE id = :rid"),
+            {"rid": rev_id},
+        )
 
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM parts WHERE id = :pid"), {"pid": part_id})
