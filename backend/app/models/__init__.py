@@ -8,8 +8,8 @@ from app.models.numbering import ClassAttribute, NumberRange, PartClass
 from app.models.part import Part, PartRevision
 from app.models.preview import PreviewJob
 from app.models.report import ReportExport
-from app.models.user import User
 from app.models.units import Unit
+from app.models.user import User
 from app.models.workflow import WorkflowTransition
 
 __all__ = [
