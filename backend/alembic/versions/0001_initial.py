@@ -335,25 +335,24 @@ def downgrade() -> None:
     if _is_pg():
         op.execute("DROP TRIGGER IF EXISTS trg_immutable_released ON part_revisions;")
         op.execute("DROP FUNCTION IF EXISTS prevent_mutation_of_released();")
-    for table in reversed(
-        [
-            "confirmations",
-            "report_exports",
-            "audit_log",
-            "workflow_transitions",
-            "eco_part_revisions",
-            "ecos",
-            "ecrs",
-            "doc_links",
-            "doc_files",
-            "doc_revisions",
-            "documents",
-            "bom_items",
-            "part_revisions",
-            "parts",
-            "part_classes",
-            "number_ranges",
-            "users",
-        ]
-    ):
+    # drop in reverse-dependency order: dependents first, users last
+    for table in [
+        "confirmations",
+        "report_exports",
+        "audit_log",
+        "workflow_transitions",
+        "eco_part_revisions",
+        "ecos",
+        "ecrs",
+        "doc_links",
+        "doc_files",
+        "doc_revisions",
+        "documents",
+        "bom_items",
+        "part_revisions",
+        "parts",
+        "part_classes",
+        "number_ranges",
+        "users",
+    ]:
         op.drop_table(table)
