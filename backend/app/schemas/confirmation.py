@@ -85,6 +85,11 @@ class EcoAddAffectedPayload(BaseModel):
     reason: str | None = None
 
 
+class CreateReportPayload(BaseModel):
+    part_number: str
+    reason: str | None = None
+
+
 ACTION_SCHEMAS = {
     "create_part": CreatePartPayload,
     "create_revision": CreateRevisionPayload,
@@ -99,6 +104,7 @@ ACTION_SCHEMAS = {
     "create_eco": CreateEcoPayload,
     "transition_eco": TransitionEcoPayload,
     "eco_add_affected": EcoAddAffectedPayload,
+    "create_report": CreateReportPayload,
 }
 
 
@@ -124,6 +130,7 @@ ConfirmationPayload = (
     | CreateEcoPayload
     | TransitionEcoPayload
     | EcoAddAffectedPayload
+    | CreateReportPayload
 )
 
 

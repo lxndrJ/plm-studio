@@ -19,7 +19,8 @@ project document "PLM-System Blueprint". Rules for agents:
 - [x] M4 Documents and preview pipeline (upload/download, browser-native SVG/PDF, thumbnail/convert queue via preview_jobs + worker; originals immutable)
 - [x] M5 ECR/ECO endpoints (ECR open->in_review->approved/rejected, ECO draft->approved->executed,
       affected part revisions on the ECO, confirmation-token path for all writes; models + matrix were already in place)
-- [ ] M6 Report engine (Typst)
+- [x] M6 Report engine (Typst): versioned PDF reports (`RPT-...`) with frozen `content_snapshot`,
+      released-only content filter (internal attributes like preis/lieferant stripped), PDF download, confirmation-token path
 - [ ] M7 AI layer (LiteLLM, tools from /openapi.json, guardrails)
 
 ## Quickstart
@@ -57,6 +58,7 @@ test walkthrough.
 - `POST /confirmations/{id}/approve|reject`
 - `GET/POST /documents`, `POST /documents/{nr}/revisions`, `.../files` (upload), `/links`, `GET /doc-files/{id}/download|preview`, `POST /doc-revisions/{id}/transition`
 - `GET/POST /ecrs`, `GET /ecrs/{nr}`, `POST /ecrs/{nr}/transition`, `POST /ecrs/{nr}/ecos`, `GET /ecos`, `GET /ecos/{nr}`, `POST /ecos/{nr}/transition`, `POST/DELETE /ecos/{nr}/affected-revisions[...]` (ECO only from an approved ECR; affected revisions editable only in draft)
+- `POST /reports/parts/{pn}`, `GET /reports`, `GET /reports/{id}`, `GET /reports/{id}/download` (PDF via Typst; snapshot contains only released content, internal attributes stripped)
 - `GET /admin/health`, `/admin/number-ranges`, `/admin/part-classes`, `/admin/audit-log` (admin)
 
 ## Core principles

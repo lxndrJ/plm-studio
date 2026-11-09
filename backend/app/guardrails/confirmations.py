@@ -189,6 +189,13 @@ def _execute(db: Session, user: User, conf: Confirmation) -> dict:
             "revision_id": str(rev.id),
             "part_number": payload.part_number,
         }
+    if conf.action == "create_report":
+        from app.services import report_service
+
+        row = report_service.create_report(
+            db, user=user, part_number=payload.part_number, reason=payload.reason
+        )
+        return {"report_id": row.report_id}
     raise ValidationError(f"unknown confirmation action '{conf.action}'", code="unknown_action")
 
 
