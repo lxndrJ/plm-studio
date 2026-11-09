@@ -72,6 +72,14 @@ test walkthrough.
 Decisions and rationale: docs/adr/. Number ranges: docs/number-ranges.md.
 Runbooks: docs/runbooks/.
 
+## Updates & dependencies
+
+- Python deps (`backend/pyproject.toml`), Docker base images and GitHub
+  Actions are updated via Dependabot (`.github/dependabot.yml`, weekly PRs).
+- Schema changes only via new Alembic migrations, never by hand in the DB.
+- The Typst binary in `backend/Dockerfile` is pinned via `ARG TYPST_VERSION`;
+  bump it deliberately together with a Typst release.
+
 ## Structure
 
     backend/    FastAPI app + Alembic + tests (app/{core,models,schemas,api,services,guardrails})

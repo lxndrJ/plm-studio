@@ -4,7 +4,7 @@ Status: accepted (2026-11-08)
 
 ## Context
 
-Small team, self-hosted on a VPS (Raspberry Pi as a test option), AI prompt
+Small team, self-hosted on a VPS, AI prompt
 layer as the primary interface, internal file management for vector/JPEG,
 and report generation for external parties.
 
@@ -23,7 +23,7 @@ Docker Compose as deployment, Typst for reports.
   divergent tool description.
 - LiteLLM: models (Mistral/DeepSeek/local) interchangeable without code
   changes, cost control centralized.
-- Typst: PDF generation without headless Chrome, runs on ARM.
+- Typst: PDF generation without headless Chrome, ships as a single static binary.
 
 ## Alternatives (rejected)
 

@@ -161,6 +161,48 @@ def test_viewer_can_read_but_not_create(client, editor, approver, viewer, fake_t
     assert len(client.get("/api/v1/reports", headers=viewer).json()) == 1
 
 
+def test_report_uses_latest_released_revision(client, editor, approver, fake_typst):
+    part = create_part(client, editor, "Multi-Rev-Teil")
+    _release(client, editor, approver, part["part_number"])
+    r = client.post(
+        f"/api/v1/parts/{part['part_number']}/revisions?direct=true",
+        json={"change_reason": "update"},
+        headers=editor,
+    )
+    assert r.status_code == 201
+    rev2 = _rev_id(client, editor, part["part_number"], "02")
+    for to, h in (("review", editor), ("released", approver)):
+        r = client.post(
+            f"/api/v1/revisions/{rev2}/transition?direct=true",
+            json={"to_status": to, "reason": "rev 02 freigeben"},
+            headers=h,
+        )
+        assert r.status_code == 200, r.text
+    r = client.post(
+        f"/api/v1/reports/parts/{part['part_number']}?direct=true", json={}, headers=editor
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["content_snapshot"]["revision"]["revision"] == "02"
+    assert r.json()["content_snapshot"]["revision"]["status"] == "released"
+
+
+def test_download_missing_pdf_is_404(client, editor, approver, fake_typst):
+    from app.services import report_service
+
+    part = create_part(client, editor, "PDF-weg-Teil")
+    _release(client, editor, approver, part["part_number"])
+    r = client.post(
+        f"/api/v1/reports/parts/{part['part_number']}?direct=true", json={}, headers=editor
+    )
+    assert r.status_code == 201
+    report_id = r.json()["report_id"]
+    assert report_service.pdf_path(report_id).exists()
+    report_service.pdf_path(report_id).unlink()
+    r = client.get(f"/api/v1/reports/{report_id}/download", headers=editor)
+    assert r.status_code == 404
+    assert r.json()["code"] == "report_file_missing"
+
+
 def test_renderer_unavailable_is_503_and_creates_no_report(client, editor, approver, monkeypatch):
     from app.core.config import get_settings
 
