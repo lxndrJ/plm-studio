@@ -24,6 +24,11 @@ updates:
     directory: "/frontend"
     schedule:
       interval: "weekly"
+    # the UI is Svelte 4 (kit 2.x); major bumps (svelte 5, kit 3, ...) are
+    # breaking and must be done deliberately, not by Dependabot
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
