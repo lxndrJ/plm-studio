@@ -25,12 +25,13 @@ RUN set -eux; \
 
 RUN pip install --no-cache-dir --upgrade pip
 
+# source before install, so the wheel actually contains the 'app' package
 COPY pyproject.toml ./
+COPY app ./app
 RUN pip install --no-cache-dir .
 
 COPY alembic.ini ./
 COPY alembic ./alembic
-COPY app ./app
 
 EXPOSE 8000
 

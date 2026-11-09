@@ -8,7 +8,11 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
+_here = Path(__file__).resolve().parent
+for _cand in (_here / "backend", _here.parent / "backend"):
+    if (_cand / "app").is_dir():
+        sys.path.insert(0, str(_cand))
+        break
 
 from app.core.db import SessionLocal  # noqa: E402
 from app.services.preview_service import process_next_job  # noqa: E402
@@ -23,7 +27,9 @@ def main() -> None:
         try:
             job = process_next_job(db)
             if job is not None:
-                print(f"job {job.id}: {job.status} (file {job.doc_file_id})", flush=True)
+                print(
+                    f"job {job.id}: {job.status} (file {job.doc_file_id})", flush=True
+                )
         except Exception as exc:
             print(f"worker error: {exc}", flush=True)
             db.rollback()
