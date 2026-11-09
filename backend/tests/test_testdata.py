@@ -122,3 +122,16 @@ def test_multilevel_bom_and_sizes(client, editor):
     ).json()
     assert any(w["depth"] >= 2 for w in wu), f"expected where-used depth >= 2, got {wu}"
     assert any(w["parent_part_number"] == asm["part_number"] for w in wu)
+
+
+def test_system_user_tolerates_multiple_admins(client, editor, db):
+    from app.core import security
+    from app.models.user import User
+    from app.services.testdata import _system_user
+
+    db.add(
+        User(email="admin2@example.com", password_hash=security.hash_password("x"), role="admin")
+    )
+    db.commit()
+    user = _system_user(db)
+    assert user is not None and user.role == "admin"
