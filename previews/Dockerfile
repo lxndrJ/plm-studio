@@ -5,11 +5,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# shared backend code (models + preview service) + image tooling
+# shared backend package (source must be present BEFORE pip install, otherwise
+# the wheel contains no 'app' package) + image tooling
 COPY backend/pyproject.toml ./backend/pyproject.toml
+COPY backend/app ./backend/app
 RUN pip install --no-cache-dir ./backend pillow
 
-COPY backend/app ./backend/app
 COPY previews/worker.py ./worker.py
 
 CMD ["python", "worker.py"]
