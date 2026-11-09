@@ -50,7 +50,12 @@ def create_part(
         entity_id=part.id,
         action="create",
         user_id=user.id,
-        new_values={"part_number": part.part_number, "name": part.name, "part_type": part.part_type, "class_id": str(class_id)},
+        new_values={
+            "part_number": part.part_number,
+            "name": part.name,
+            "part_type": part.part_type,
+            "class_id": str(class_id),
+        },
         reason=reason,
     )
     audit_service.log_change(
@@ -78,17 +83,23 @@ def create_revision(
     user: User,
     part: Part,
     change_reason: str,
+    base_revision: PartRevision | None = None,
+    commit: bool = True,
 ) -> PartRevision:
     """New revision of a part. Released revisions are immutable, so changes
     always land in a fresh draft that inherits BOM and attributes of the
-    latest revision."""
+    latest revision (or of base_revision, e.g. the ECO-affected revision).
+    commit=False lets the caller bundle several revisions into one transaction."""
     label = next_revision_label(db, part.id)
-    previous = db.execute(
-        select(PartRevision)
-        .where(PartRevision.part_id == part.id)
-        .order_by(PartRevision.revision.desc())
-        .limit(1)
-    ).scalar_one_or_none()
+    if base_revision is not None:
+        previous = base_revision
+    else:
+        previous = db.execute(
+            select(PartRevision)
+            .where(PartRevision.part_id == part.id)
+            .order_by(PartRevision.revision.desc())
+            .limit(1)
+        ).scalar_one_or_none()
     rev = PartRevision(
         part_id=part.id,
         revision=label,
@@ -100,7 +111,9 @@ def create_revision(
     db.add(rev)
     db.flush()
     if previous is not None:
-        for item in db.execute(select(BomItem).where(BomItem.parent_rev_id == previous.id)).scalars():
+        for item in db.execute(
+            select(BomItem).where(BomItem.parent_rev_id == previous.id)
+        ).scalars():
             db.add(
                 BomItem(
                     parent_rev_id=rev.id,
@@ -116,11 +129,16 @@ def create_revision(
         entity_id=rev.id,
         action="create",
         user_id=user.id,
-        new_values={"part_number": part.part_number, "revision": rev.revision, "status": rev.status},
+        new_values={
+            "part_number": part.part_number,
+            "revision": rev.revision,
+            "status": rev.status,
+        },
         reason=change_reason,
     )
-    db.commit()
-    db.refresh(rev)
+    if commit:
+        db.commit()
+        db.refresh(rev)
     return rev
 
 
@@ -187,7 +205,9 @@ def _class_subtree_ids(db: Session, class_code: str) -> list:
     return list(ids)
 
 
-def search_parts(db: Session, query: str | None, class_code: str | None, limit: int = 50) -> list[Part]:
+def search_parts(
+    db: Session, query: str | None, class_code: str | None, limit: int = 50
+) -> list[Part]:
     stmt = select(Part).order_by(Part.part_number).limit(limit)
     if query:
         like = f"%{query}%"

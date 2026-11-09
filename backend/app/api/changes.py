@@ -17,6 +17,7 @@ from app.schemas.change import (
     EcoResponse,
     EcoSummary,
     EcoTransitionRequest,
+    EcoTransitionResponse,
     EcrCreate,
     EcrDetail,
     EcrSummary,
@@ -165,7 +166,7 @@ def get_eco(number: str, db: DbSession, user: CurrentUser):
     return _eco_response(db, change_service.get_eco_by_number(db, number))
 
 
-@router.post("/ecos/{number}/transition", response_model=EcoResponse)
+@router.post("/ecos/{number}/transition", response_model=EcoTransitionResponse)
 def transition_eco(
     number: str,
     body: EcoTransitionRequest,
@@ -188,10 +189,10 @@ def transition_eco(
                 mode="json"
             ),
         )
-    eco = change_service.transition_eco(
+    eco, created = change_service.transition_eco(
         db, user=user, eco=eco, to_status=body.to_status, reason=body.reason
     )
-    return _eco_response(db, eco)
+    return EcoTransitionResponse(**_eco_response(db, eco).model_dump(), created_revisions=created)
 
 
 @router.post(

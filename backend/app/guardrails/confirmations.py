@@ -168,10 +168,10 @@ def _execute(db: Session, user: User, conf: Confirmation) -> dict:
         from app.services import change_service
 
         eco = change_service.get_eco_by_number(db, payload.eco_number)
-        eco = change_service.transition_eco(
+        eco, created = change_service.transition_eco(
             db, user=user, eco=eco, to_status=payload.to_status, reason=payload.reason
         )
-        return {"eco_number": eco.number, "status": eco.status}
+        return {"eco_number": eco.number, "status": eco.status, "created_revisions": created}
     if conf.action == "eco_add_affected":
         from app.services import change_service
 

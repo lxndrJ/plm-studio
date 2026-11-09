@@ -1,4 +1,4 @@
-from tests.conftest import create_part
+from tests.conftest import create_part, release_part
 
 
 def _create_ecr(client, headers, description="Gehaeuse aendern", **extra):
@@ -184,6 +184,7 @@ def test_eco_via_confirmation_token(client, editor, approver):
 
 def test_eco_affected_revisions_add_list_remove(client, editor, approver):
     part = create_part(client, editor, "Betroffener Teil")
+    release_part(client, editor, approver, part["part_number"])
     ecr = _create_ecr(client, editor)
     _approve_ecr(client, editor, approver, ecr["number"])
     eco = _create_eco(client, editor, ecr["number"])
@@ -198,7 +199,7 @@ def test_eco_affected_revisions_add_list_remove(client, editor, approver):
     entry = r.json()
     assert entry["part_number"] == part["part_number"]
     assert entry["revision"] == "01"
-    assert entry["status"] == "draft"
+    assert entry["status"] == "released"
 
     r = client.post(
         f"/api/v1/ecos/{n}/affected-revisions?direct=true",
@@ -231,6 +232,7 @@ def test_eco_affected_revisions_add_list_remove(client, editor, approver):
 
 def test_eco_affected_revisions_locked_after_approval(client, editor, approver):
     part = create_part(client, editor, "Teil L")
+    release_part(client, editor, approver, part["part_number"])
     ecr = _create_ecr(client, editor)
     _approve_ecr(client, editor, approver, ecr["number"])
     eco = _create_eco(client, editor, ecr["number"])
@@ -314,6 +316,7 @@ def test_eco_transition_via_confirmation_token(client, editor, approver):
 
 def test_eco_add_affected_via_confirmation_token(client, editor, approver):
     part = create_part(client, editor, "Teil C")
+    release_part(client, editor, approver, part["part_number"])
     ecr = _create_ecr(client, editor)
     _approve_ecr(client, editor, approver, ecr["number"])
     eco = _create_eco(client, editor, ecr["number"])
@@ -376,6 +379,7 @@ def test_proposed_create_eco_revalidates_at_approval(client, editor):
 
 def test_delete_affected_locked_after_approval(client, editor, approver):
     part = create_part(client, editor, "Teil D")
+    release_part(client, editor, approver, part["part_number"])
     ecr = _create_ecr(client, editor)
     _approve_ecr(client, editor, approver, ecr["number"])
     eco = _create_eco(client, editor, ecr["number"])

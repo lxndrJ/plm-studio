@@ -8,6 +8,7 @@ from app.models.change import Eco, Ecr
 from app.models.part import PartRevision
 from app.models.user import User
 from app.services import audit as audit_service
+from app.services import part_service
 from app.services.bom_service import resolve_component_revision
 from app.services.numbering import allocate_number
 from app.services.workflow import assert_transition_allowed
@@ -105,10 +106,37 @@ def create_eco(db: Session, *, user: User, ecr: Ecr, reason: str | None = None) 
     return eco
 
 
-def transition_eco(db: Session, *, user: User, eco: Eco, to_status: str, reason: str) -> Eco:
+def transition_eco(
+    db: Session, *, user: User, eco: Eco, to_status: str, reason: str
+) -> tuple[Eco, list[dict]]:
+    """Workflow transition of an ECO. `approved -> executed` additionally creates
+    one successor draft revision per affected (released) part revision, inheriting
+    attributes and BOM; everything in one transaction. Returns (eco, created).
+    Re-execution is impossible: the workflow matrix has no executed -> executed row."""
     assert_transition_allowed(
         db, entity_type="eco", from_status=eco.status, to_status=to_status, user_role=user.role
     )
+    created: list[dict] = []
+    if to_status == "executed":
+        ecr = eco.ecr
+        for rev in eco.affected_revisions:
+            change_reason = f"ECO {eco.number} (ECR {ecr.number}): {ecr.description}"
+            new_rev = part_service.create_revision(
+                db,
+                user=user,
+                part=rev.part,
+                change_reason=change_reason,
+                base_revision=rev,
+                commit=False,
+            )
+            created.append(
+                {
+                    "part_number": rev.part.part_number,
+                    "revision": new_rev.revision,
+                    "revision_id": str(new_rev.id),
+                    "status": new_rev.status,
+                }
+            )
     old = {"status": eco.status}
     eco.status = to_status
     audit_service.log_change(
@@ -121,9 +149,19 @@ def transition_eco(db: Session, *, user: User, eco: Eco, to_status: str, reason:
         new_values={"status": to_status},
         reason=reason,
     )
+    if created:
+        audit_service.log_change(
+            db,
+            entity_type="eco",
+            entity_id=eco.id,
+            action="execute",
+            user_id=user.id,
+            new_values={"eco_number": eco.number, "created_revisions": created},
+            reason=reason,
+        )
     db.commit()
     db.refresh(eco)
-    return eco
+    return eco, created
 
 
 def _assert_eco_draft(eco: Eco) -> None:
@@ -146,6 +184,18 @@ def add_affected_revision(
 ) -> PartRevision:
     _assert_eco_draft(eco)
     rev = resolve_component_revision(db, part_number, revision)
+    if rev.status != "released":
+        raise ConflictError(
+            f"only released revisions can be affected by an ECO "
+            f"(got '{rev.status}' for {part_number} rev {rev.revision})",
+            code="affected_not_released",
+            details={
+                "eco_number": eco.number,
+                "part_number": part_number,
+                "revision": rev.revision,
+                "status": rev.status,
+            },
+        )
     if any(r.id == rev.id for r in eco.affected_revisions):
         raise ConflictError(
             f"revision {rev.revision} of '{part_number}' is already affected by ECO '{eco.number}'",

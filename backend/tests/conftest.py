@@ -91,3 +91,18 @@ def create_part(client, headers, name, class_code="MECH", part_type="part", **ex
     r = client.post("/api/v1/parts?direct=true", json=payload, headers=headers)
     assert r.status_code == 201, r.text
     return r.json()
+
+
+def release_part(client, editor, approver, part_number: str, rev: str = "01"):
+    """Walk a revision through draft -> review -> released (workflow matrix)."""
+    r = client.get(f"/api/v1/parts/{part_number}/revisions", headers=editor)
+    assert r.status_code == 200, r.text
+    rev_id = next(x["id"] for x in r.json() if x["revision"] == rev)
+    for to_status, headers in (("review", editor), ("released", approver)):
+        r = client.post(
+            f"/api/v1/revisions/{rev_id}/transition?direct=true",
+            json={"to_status": to_status, "reason": "zur Freigabe"},
+            headers=headers,
+        )
+        assert r.status_code == 200, r.text
+    return rev_id
