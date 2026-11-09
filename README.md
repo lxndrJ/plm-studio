@@ -50,6 +50,7 @@ assemblies with BOM lines; SKU = part number):
     cd backend && python -m app.services.testdata --count 200 [--levels 1] [--seed 42] [--reset]
     # bigger demo: --count 2000 --levels 3  (multi-level BOMs, assemblies in assemblies)
     # find them via GET /api/v1/parts?class_code=TEST or ?query=TEST
+    # details: docs/runbooks/demo-data.md
 
 See [docs/runbooks/test-phase1.md](docs/runbooks/test-phase1.md) for the full
 test walkthrough.
