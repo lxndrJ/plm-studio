@@ -1,22 +1,51 @@
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
+from alembic.config import Config
 from fastapi import FastAPI
 from sqlalchemy import select
 
+from alembic import command
 from app.api import admin, auth, bom, changes, confirmations, documents, parts, reports, revisions
 from app.core import security
 from app.core.config import get_settings
 from app.core.db import SessionLocal, engine
 from app.core.errors import register_error_handlers
-from app.models import Base
 from app.models.user import User
 from app.services.seed import seed_all
+
+
+def ensure_schema(engine, database_url: str) -> None:
+    """Schema exclusively via Alembic. On a completely empty DB (no tables and
+    no alembic_version) migrations run programmatically; on an initialized DB
+    this is a no-op. Never create_all here: that would create tables without
+    an alembic_version row and break a later `alembic upgrade head` with
+    DuplicateTable."""
+    from sqlalchemy import inspect
+
+    insp = inspect(engine)
+    if insp.has_table("alembic_version") or insp.has_table("users"):
+        return
+    cfg = Config(str(Path(__file__).resolve().parent.parent / "alembic.ini"))
+    cfg.set_main_option("sqlalchemy.url", database_url)
+    # alembic/env.py prefers the DATABASE_URL env var; pin it so the migration
+    # always runs against the intended database
+    old = os.environ.get("DATABASE_URL")
+    os.environ["DATABASE_URL"] = database_url
+    try:
+        command.upgrade(cfg, "head")
+    finally:
+        if old is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = old
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    Base.metadata.create_all(bind=engine)
+    ensure_schema(engine, settings.DATABASE_URL)
     db = SessionLocal()
     try:
         seed_all(db)
