@@ -7,7 +7,7 @@ cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 export DATABASE_URL="postgresql+psycopg://plm:plm@localhost:5432/plm"  # or sqlite:///./dev.db
-alembic upgrade head          # migrations
+alembic upgrade head          # migrations BEFORE first app start (the app would otherwise create tables without alembic_version)
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -21,9 +21,12 @@ Tests: `pytest` (run on SQLite, no Docker).
 
 ```bash
 cp .env.example .env   # set passwords / JWT secret
- docker compose up -d --build
-docker compose exec api alembic upgrade head
+ docker compose up -d --build   # the one-shot 'migrate' service runs alembic upgrade head before the API starts
 ```
+
+Schema changes always go through Alembic (never by hand in the DB). A manual
+`docker compose exec api alembic upgrade head` is a harmless no-op when the
+DB is already at head.
 
 - Reverse proxy (Caddy or Traefik) in front, TLS automatic. In code the
   refresh cookie uses `secure=False` — set it to `True` behind HTTPS.
