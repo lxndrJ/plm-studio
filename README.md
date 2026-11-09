@@ -23,17 +23,14 @@ project document "PLM-System Blueprint". Rules for agents:
       released-only content filter (internal attributes like preis/lieferant stripped), PDF download, confirmation-token path
 - [x] M7 AI layer (agent/: tools generated from /openapi.json via `plm_agent.toolgen`,
       ReAct runner via LiteLLM, guardrails: no `direct` writes, never self-approve confirmations, 429/5xx backoff)
-<<<<<<< HEAD
 - [x] M8 Phase-2 security: user management (`GET/PATCH /auth/users`, deactivate, role change with
       self-lockout guard), password change + admin reset (token invalidation via password fingerprint),
       logout revokes access+refresh tokens (jti denylist, migration 0004), login rate limiting
       (429 + Retry-After, migration 0004, configurable via `LOGIN_RATE_LIMIT_*`) — all audited
-=======
 - [x] M9 Phase-2 ECO execution: `approved -> executed` creates one successor draft revision per
       affected (released-only, 409 `affected_not_released`) part revision, inheriting attributes+BOM,
       `change_reason` references ECO/ECR, idempotent via the workflow matrix, fully audited;
       see docs/changes.md
->>>>>>> 785cd70 (feat(backend): M9 ECO execution - 'executed' creates successor revisions)
 
 ## Quickstart
 
