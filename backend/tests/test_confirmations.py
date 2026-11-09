@@ -64,7 +64,11 @@ def test_viewer_cannot_approve(client, editor, viewer):
 
 
 def test_confirmed_write_lands_in_audit_log(client, editor, admin):
-    create_part(client, editor, "Direkt", )
+    create_part(
+        client,
+        editor,
+        "Direkt",
+    )
     r = client.post(
         "/api/v1/parts",
         json={"name": "Per Token", "class_code": "MECH"},
@@ -76,3 +80,18 @@ def test_confirmed_write_lands_in_audit_log(client, editor, admin):
     actions = {(e["entity_type"], e["action"]) for e in log}
     assert ("part", "create") in actions
     assert ("part_revision", "create") in actions
+
+
+def test_list_confirmations_with_status_filter(client, editor):
+    r = client.post("/api/v1/parts", json={"name": "Liste A", "class_code": "MECH"}, headers=editor)
+    conf_id = r.json()["confirmation_id"]
+
+    rows = client.get("/api/v1/confirmations", headers=editor).json()
+    assert len(rows) == 1 and rows[0]["id"] == conf_id and rows[0]["status"] == "proposed"
+
+    assert client.get("/api/v1/confirmations?status=executed", headers=editor).json() == []
+
+    client.post(f"/api/v1/confirmations/{conf_id}/approve", headers=editor)
+    assert client.get("/api/v1/confirmations?status=proposed", headers=editor).json() == []
+    rows = client.get("/api/v1/confirmations?status=executed", headers=editor).json()
+    assert len(rows) == 1 and rows[0]["action"] == "create_part"
