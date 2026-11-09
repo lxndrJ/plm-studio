@@ -35,8 +35,9 @@ Blueprint and milestones M0-M7: see README.md and docs/.
 9. Part classes form a tree via part_classes.parent_id. Class filters in
    search include the whole subtree; unknown class codes are 404.
 
-## Next milestone (M5)
+## Next milestone (M6)
 
-ECR/ECO endpoints (models + workflow matrix already in place); then report
-engine (M6), AI layer (M7). M1-M4 are implemented incl. tests
-(backend/tests, running on SQLite).
+Report engine (Typst); then AI layer (M7). M1-M5 are implemented incl. tests
+(backend/tests, running on SQLite). M5 added the ECR/ECO endpoints
+(app/api/changes.py, app/services/change_service.py): ECO only from an
+approved ECR, affected part revisions only editable while the ECO is draft.

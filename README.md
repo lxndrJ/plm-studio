@@ -17,7 +17,8 @@ project document "PLM-System Blueprint". Rules for agents:
       immutable via trigger + service check, audit log on every write)
 - [x] M3 BOM and where-used (recursive CTE, BOM diff added/removed/changed)
 - [x] M4 Documents and preview pipeline (upload/download, browser-native SVG/PDF, thumbnail/convert queue via preview_jobs + worker; originals immutable)
-- [ ] M5 ECR/ECO endpoints (matrix + models in place; part_revision/doc_revision transition APIs are live)
+- [x] M5 ECR/ECO endpoints (ECR open->in_review->approved/rejected, ECO draft->approved->executed,
+      affected part revisions on the ECO, confirmation-token path for all writes; models + matrix were already in place)
 - [ ] M6 Report engine (Typst)
 - [ ] M7 AI layer (LiteLLM, tools from /openapi.json, guardrails)
 
@@ -48,6 +49,7 @@ test walkthrough.
 - `GET/POST/PUT/DELETE /bom/...`, `GET /bom/parts/{pn}/where-used`, `GET /bom/parts/{pn}/diff`
 - `POST /confirmations/{id}/approve|reject`
 - `GET/POST /documents`, `POST /documents/{nr}/revisions`, `.../files` (upload), `/links`, `GET /doc-files/{id}/download|preview`, `POST /doc-revisions/{id}/transition`
+- `GET/POST /ecrs`, `GET /ecrs/{nr}`, `POST /ecrs/{nr}/transition`, `POST /ecrs/{nr}/ecos`, `GET /ecos`, `GET /ecos/{nr}`, `POST /ecos/{nr}/transition`, `POST/DELETE /ecos/{nr}/affected-revisions[...]` (ECO only from an approved ECR; affected revisions editable only in draft)
 - `GET /admin/health`, `/admin/number-ranges`, `/admin/part-classes`, `/admin/audit-log` (admin)
 
 ## Core principles
