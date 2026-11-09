@@ -16,6 +16,20 @@ from app.models.user import User
 from app.services.seed import seed_all
 
 
+def bootstrap_admin_email(email: str) -> str:
+    """The bootstrap admin email must pass the same EmailStr validation as the
+    login endpoint — otherwise the user gets created but can never log in
+    (email-validator rejects reserved/special-use domains like .local)."""
+    from pydantic import EmailStr, TypeAdapter
+
+    try:
+        return str(TypeAdapter(EmailStr).validate_python(email))
+    except Exception as e:
+        raise RuntimeError(
+            f"BOOTSTRAP_ADMIN_EMAIL '{email}' would be unusable at login (reserved/special-use domain?): {e}"
+        ) from e
+
+
 def ensure_schema(engine, database_url: str) -> None:
     """Schema exclusively via Alembic. On a completely empty DB (no tables and
     no alembic_version) migrations run programmatically; on an initialized DB
@@ -51,7 +65,7 @@ async def lifespan(app: FastAPI):
         seed_all(db)
         if db.execute(select(User.id).limit(1)).first() is None:
             admin_user = User(
-                email=settings.BOOTSTRAP_ADMIN_EMAIL,
+                email=bootstrap_admin_email(settings.BOOTSTRAP_ADMIN_EMAIL),
                 password_hash=security.hash_password(settings.BOOTSTRAP_ADMIN_PASSWORD),
                 role="admin",
             )

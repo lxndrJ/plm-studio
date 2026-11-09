@@ -17,6 +17,8 @@ Afterwards create more users as admin: `POST /api/v1/auth/users`.
 
 Tests: `pytest` (run on SQLite, no Docker).
 
+Demo data: see [demo-data.md](demo-data.md) (`python -m app.services.testdata --count 2000 --levels 3`).
+
 ## VPS (production)
 
 ```bash

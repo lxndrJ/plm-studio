@@ -22,3 +22,14 @@ def test_ensure_schema_is_noop_when_tables_already_exist(tmp_path):
     ensure_schema(engine, url)
     assert not inspect(engine).has_table("alembic_version")
     assert inspect(engine).has_table("users")
+
+
+def test_bootstrap_admin_email_validation():
+    import pytest
+
+    from app.main import bootstrap_admin_email
+
+    assert bootstrap_admin_email("admin@example.com") == "admin@example.com"
+    assert bootstrap_admin_email("admin@plm-studio.dev") == "admin@plm-studio.dev"
+    with pytest.raises(RuntimeError, match="BOOTSTRAP_ADMIN_EMAIL"):
+        bootstrap_admin_email("admin@plm.local")
