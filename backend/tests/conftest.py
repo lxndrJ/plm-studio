@@ -1,7 +1,9 @@
 import os
 import tempfile
 
-os.environ.setdefault("DATABASE_URL", "sqlite:///" + os.path.join(tempfile.mkdtemp(prefix="plm-test-"), "test.db"))
+os.environ.setdefault(
+    "DATABASE_URL", "sqlite:///" + os.path.join(tempfile.mkdtemp(prefix="plm-test-"), "test.db")
+)
 os.environ.setdefault("JWT_SECRET", "test-secret")
 os.environ.setdefault("BOOTSTRAP_ADMIN_EMAIL", "admin@example.com")
 os.environ.setdefault("BOOTSTRAP_ADMIN_PASSWORD", "admin-pw")
@@ -12,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from app.core import security
 from app.core.db import SessionLocal, engine
+from app.guardrails import rate_limit
 from app.main import app
 from app.models import Base
 from app.models.user import User
@@ -26,6 +29,7 @@ USERS = {
 
 
 def _reset_db():
+    rate_limit.reset()
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()

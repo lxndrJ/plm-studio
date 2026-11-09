@@ -7,11 +7,25 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.errors import ForbiddenError, UnauthorizedError
 from app.core.security import decode_token
+from app.guardrails.revocation import is_revoked, token_invalidated_by_password_change
 from app.models.user import User
 
 ROLE_RANK = {"viewer": 1, "editor": 2, "approver": 3, "admin": 4}
 
 DbSession = Annotated[Session, Depends(get_db)]
+
+
+def decode_access_payload(db: DbSession, token: str) -> dict:
+    try:
+        payload = decode_token(token)
+    except jwt.PyJWTError:
+        raise UnauthorizedError("invalid or expired token")
+    if payload.get("type") != "access":
+        raise UnauthorizedError("not an access token")
+    jti = payload.get("jti")
+    if jti is not None and is_revoked(db, jti):
+        raise UnauthorizedError("token has been revoked", code="token_revoked")
+    return payload
 
 
 def get_current_user(
@@ -21,15 +35,14 @@ def get_current_user(
     if not authorization or not authorization.startswith("Bearer "):
         raise UnauthorizedError("missing bearer token")
     token = authorization.removeprefix("Bearer ").strip()
-    try:
-        payload = decode_token(token)
-    except jwt.PyJWTError:
-        raise UnauthorizedError("invalid or expired token")
-    if payload.get("type") != "access":
-        raise UnauthorizedError("not an access token")
+    payload = decode_access_payload(db, token)
     user = db.query(User).filter(User.email == payload.get("sub")).first()
     if user is None:
         raise UnauthorizedError("user no longer exists")
+    if not user.is_active:
+        raise UnauthorizedError("account is deactivated", code="user_inactive")
+    if token_invalidated_by_password_change(user, payload):
+        raise UnauthorizedError("token invalidated by password change", code="token_invalidated")
     return user
 
 

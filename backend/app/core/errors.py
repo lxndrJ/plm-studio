@@ -6,7 +6,15 @@ class ApiError(Exception):
     status_code = 400
     code = "error"
 
-    def __init__(self, message: str, *, status_code: int | None = None, code: str | None = None, details=None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        code: str | None = None,
+        details=None,
+        headers: dict | None = None,
+    ):
         super().__init__(message)
         self.message = message
         if status_code is not None:
@@ -14,6 +22,7 @@ class ApiError(Exception):
         if code is not None:
             self.code = code
         self.details = details
+        self.headers = headers or {}
 
 
 class NotFoundError(ApiError):
@@ -36,6 +45,11 @@ class UnauthorizedError(ApiError):
     code = "unauthorized"
 
 
+class TooManyRequestsError(ApiError):
+    status_code = 429
+    code = "rate_limited"
+
+
 class ValidationError(ApiError):
     status_code = 422
     code = "invalid_transition"  # overridden per call site
@@ -47,4 +61,5 @@ def register_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.message, "code": exc.code, "details": exc.details},
+            headers=exc.headers or None,
         )

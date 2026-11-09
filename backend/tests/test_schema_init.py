@@ -12,7 +12,7 @@ def test_ensure_schema_runs_alembic_on_empty_db(tmp_path):
     assert insp.has_table("users")
     assert insp.has_table("alembic_version")
     with engine.connect() as c:
-        assert c.execute(text("select version_num from alembic_version")).scalar() == "0003"
+        assert c.execute(text("select version_num from alembic_version")).scalar() == "0004"
 
 
 def test_ensure_schema_is_noop_when_tables_already_exist(tmp_path):
