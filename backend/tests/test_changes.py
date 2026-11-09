@@ -353,3 +353,45 @@ def test_eco_not_found(client, editor):
     r = client.get("/api/v1/ecos/ECO-99999", headers=editor)
     assert r.status_code == 404
     assert r.json()["code"] == "eco_not_found"
+
+
+def test_create_eco_unknown_ecr_is_404(client, editor):
+    r = client.post("/api/v1/ecrs/ECR-99999/ecos?direct=true", json={}, headers=editor)
+    assert r.status_code == 404
+    assert r.json()["code"] == "ecr_not_found"
+
+
+def test_proposed_create_eco_revalidates_at_approval(client, editor):
+    """A confirmation proposed while the ECR is still open must fail at
+    execution time (409), not silently create the ECO."""
+    ecr = _create_ecr(client, editor)
+    r = client.post(f"/api/v1/ecrs/{ecr['number']}/ecos", json={}, headers=editor)
+    assert r.status_code == 202
+    conf_id = r.json()["confirmation_id"]
+    r = client.post(f"/api/v1/confirmations/{conf_id}/approve", headers=editor)
+    assert r.status_code == 409
+    assert r.json()["code"] == "ecr_not_approved"
+    assert client.get("/api/v1/ecos", headers=editor).json() == []
+
+
+def test_delete_affected_locked_after_approval(client, editor, approver):
+    part = create_part(client, editor, "Teil D")
+    ecr = _create_ecr(client, editor)
+    _approve_ecr(client, editor, approver, ecr["number"])
+    eco = _create_eco(client, editor, ecr["number"])
+    r = client.post(
+        f"/api/v1/ecos/{eco['number']}/affected-revisions?direct=true",
+        json={"part_number": part["part_number"]},
+        headers=editor,
+    )
+    assert r.status_code == 201
+    rev_id = r.json()["revision_id"]
+    r = client.post(
+        f"/api/v1/ecos/{eco['number']}/transition?direct=true",
+        json={"to_status": "approved", "reason": "ok"},
+        headers=approver,
+    )
+    assert r.status_code == 200
+    r = client.delete(f"/api/v1/ecos/{eco['number']}/affected-revisions/{rev_id}", headers=editor)
+    assert r.status_code == 409
+    assert r.json()["code"] == "eco_not_draft"
