@@ -24,6 +24,7 @@ class PartClassCreate(BaseModel):
     code: str = Field(min_length=1, max_length=20, pattern="^[A-Z0-9_]+$")
     name: str
     default_attributes: dict = Field(default_factory=dict)
+    parent_code: str | None = None
 
 
 class PartClassResponse(BaseModel):
@@ -31,6 +32,7 @@ class PartClassResponse(BaseModel):
     code: str
     name: str
     default_attributes: dict
+    parent_id: uuid.UUID | None = None
 
     class Config:
         from_attributes = True

@@ -20,7 +20,6 @@ def test_unique_part_revision_enforced(client, db):
         name="t",
         part_type="part",
         class_id=cls.id,
-        attributes={},
     )
     db.add(part)
     db.flush()
@@ -35,7 +34,7 @@ def test_unique_part_revision_enforced(client, db):
 def test_bom_self_reference_check_enforced(client, db):
     user = db.execute(sa.select(User).where(User.role == "editor")).scalar_one()
     cls = db.execute(sa.select(PartClass)).scalars().first()
-    part = Part(part_number="P-SELF", name="s", part_type="assembly", class_id=cls.id, attributes={})
+    part = Part(part_number="P-SELF", name="s", part_type="assembly", class_id=cls.id)
     db.add(part)
     db.flush()
     rev = PartRevision(part_id=part.id, revision="01", status="draft", change_reason="x", created_by=user.id)

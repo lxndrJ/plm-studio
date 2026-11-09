@@ -27,6 +27,7 @@ class RevisionResponse(BaseModel):
     revision: str
     status: str
     change_reason: str
+    attributes: dict = Field(default_factory=dict)
     created_at: datetime
 
     class Config:
@@ -40,7 +41,6 @@ class PartResponse(BaseModel):
     description: str | None
     part_type: str
     class_id: uuid.UUID
-    attributes: dict
     created_at: datetime
     revisions: list[RevisionResponse] = []
 
