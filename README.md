@@ -28,7 +28,7 @@ project document "PLM-System Blueprint". Rules for agents:
 
     cp .env.example .env
     docker compose up -d --build   # one-shot 'migrate' service runs alembic upgrade head before the API starts
-    # API docs: http://localhost:8000/docs
+    # UI: http://localhost:3000   |   API docs: http://localhost:8000/docs
 
 Local without Docker:
 
@@ -99,7 +99,7 @@ always come back as 202 + confirmation token and are approved by the human via
 ## Structure
 
     backend/    FastAPI app + Alembic + tests (app/{core,models,schemas,api,services,guardrails})
-    frontend/   SvelteKit (skeleton; routes /parts, /bom, ... from M2-M6)
+    frontend/   SvelteKit UI (Dashboard, Artikel, Stücklisten, ECR/ECO, Bestätigungen, Reports, Dokumente; Port 3000 via compose)
     agent/      LiteLLM config, system prompt, tool generation from /openapi.json (M7)
     previews/   Preview worker (libvips/Inkscape headless, M4)
     docs/       api-contract, number-ranges, adr, runbooks
