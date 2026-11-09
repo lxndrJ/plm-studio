@@ -38,6 +38,13 @@ Tests (run locally on SQLite, no Docker):
     cd backend && pytest
     # against Postgres (trigger test): TEST_DATABASE_URL=... pytest
 
+Test data (dev/demo): deterministic, clearly separable records in the part
+class `TEST` (name prefix `TEST `, attributes saison/farbe/preis, ~20%
+assemblies with BOM lines; SKU = part number):
+
+    cd backend && python -m app.services.testdata --count 200 [--seed 42] [--reset]
+    # find them via GET /api/v1/parts?class_code=TEST or ?query=TEST
+
 See [docs/runbooks/test-phase1.md](docs/runbooks/test-phase1.md) for the full
 test walkthrough.
 
