@@ -86,3 +86,39 @@ def test_clear_removes_only_test_parts(client, editor):
     assert remaining == [keep["part_number"]]
     r = client.get(f"/api/v1/parts?class_code={TEST_CLASS_CODE}", headers=editor)
     assert r.json() == []
+
+
+def test_multilevel_bom_and_sizes(client, editor):
+    db = SessionLocal()
+    try:
+        seed_test_data(db, count=40, seed=5, levels=3)
+    finally:
+        db.close()
+
+    rows = client.get(f"/api/v1/parts?class_code={TEST_CLASS_CODE}", headers=editor).json()
+    parts = [r for r in rows if r["part_type"] == "part"]
+    assemblies = [r for r in rows if r["part_type"] == "assembly"]
+    assert parts and assemblies
+
+    detail = client.get(f"/api/v1/parts/{parts[0]['part_number']}", headers=editor).json()
+    attrs = detail["revisions"][0]["attributes"]
+    assert attrs["groesse"] in ("XS", "S", "M", "L", "XL")
+    assert {"saison", "farbe", "preis"} <= set(attrs)
+
+    nested = None
+    for asm in assemblies:
+        bom = client.get(f"/api/v1/bom/parts/{asm['part_number']}", headers=editor).json()
+        sub = [b for b in bom if b["component_part_number"].startswith("ASM-")]
+        if sub:
+            nested = (asm, sub)
+            break
+    assert nested, "with levels=3 at least one assembly should contain a sub-assembly"
+    asm, sub = nested
+    leaf_part = client.get(
+        f"/api/v1/bom/parts/{sub[0]['component_part_number']}", headers=editor
+    ).json()[0]
+    wu = client.get(
+        f"/api/v1/bom/parts/{leaf_part['component_part_number']}/where-used", headers=editor
+    ).json()
+    assert any(w["depth"] >= 2 for w in wu), f"expected where-used depth >= 2, got {wu}"
+    assert any(w["parent_part_number"] == asm["part_number"] for w in wu)
