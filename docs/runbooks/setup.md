@@ -28,9 +28,3 @@ docker compose exec api alembic upgrade head
 - Reverse proxy (Caddy or Traefik) in front, TLS automatic. In code the
   refresh cookie uses `secure=False` — set it to `True` behind HTTPS.
 - Expose only ports 80/443 of the proxy; keep 8000/4000/5432 internal.
-
-## Raspberry Pi (test)
-
-Same compose file; images are multi-arch (postgres:16-alpine,
-python:3.12-slim, litellm). Skip the preview worker and LiteLLM if RAM is
-tight: `docker compose up -d db api`.
