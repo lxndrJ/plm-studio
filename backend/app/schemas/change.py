@@ -61,3 +61,16 @@ class AffectedRevisionResponse(BaseModel):
 
 class EcoResponse(EcoSummary):
     affected: list[AffectedRevisionResponse] = []
+
+
+class CreatedRevisionResponse(BaseModel):
+    part_number: str
+    revision: str
+    revision_id: uuid.UUID
+    status: str
+
+
+class EcoTransitionResponse(EcoResponse):
+    """Transition answer; on 'executed' it lists the successor revisions created."""
+
+    created_revisions: list[CreatedRevisionResponse] = []
