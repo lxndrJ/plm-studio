@@ -56,6 +56,35 @@ class TransitionDocRevisionPayload(BaseModel):
     reason: str = Field(min_length=1)
 
 
+class CreateEcrPayload(BaseModel):
+    description: str = Field(min_length=1, max_length=2000)
+    reason: str | None = None
+
+
+class TransitionEcrPayload(BaseModel):
+    ecr_number: str
+    to_status: str = Field(pattern="^(open|in_review|approved|rejected)$")
+    reason: str = Field(min_length=1)
+
+
+class CreateEcoPayload(BaseModel):
+    ecr_number: str
+    reason: str | None = None
+
+
+class TransitionEcoPayload(BaseModel):
+    eco_number: str
+    to_status: str = Field(pattern="^(draft|approved|executed)$")
+    reason: str = Field(min_length=1)
+
+
+class EcoAddAffectedPayload(BaseModel):
+    eco_number: str
+    part_number: str
+    revision: str | None = None
+    reason: str | None = None
+
+
 ACTION_SCHEMAS = {
     "create_part": CreatePartPayload,
     "create_revision": CreateRevisionPayload,
@@ -65,6 +94,11 @@ ACTION_SCHEMAS = {
     "create_doc_revision": CreateDocRevisionPayload,
     "link_document": LinkDocumentPayload,
     "transition_doc_revision": TransitionDocRevisionPayload,
+    "create_ecr": CreateEcrPayload,
+    "transition_ecr": TransitionEcrPayload,
+    "create_eco": CreateEcoPayload,
+    "transition_eco": TransitionEcoPayload,
+    "eco_add_affected": EcoAddAffectedPayload,
 }
 
 
@@ -85,6 +119,11 @@ ConfirmationPayload = (
     | CreateDocRevisionPayload
     | LinkDocumentPayload
     | TransitionDocRevisionPayload
+    | CreateEcrPayload
+    | TransitionEcrPayload
+    | CreateEcoPayload
+    | TransitionEcoPayload
+    | EcoAddAffectedPayload
 )
 
 
@@ -105,4 +144,6 @@ class ConfirmationProposed(BaseModel):
     confirmation_id: uuid.UUID
     status: str = "proposed"
     summary: str
-    message: str = "write proposed, not yet committed; approve via POST /api/v1/confirmations/{id}/approve"
+    message: str = (
+        "write proposed, not yet committed; approve via POST /api/v1/confirmations/{id}/approve"
+    )

@@ -50,7 +50,9 @@ def _as_utc(dt: datetime) -> datetime:
 def get_confirmation(db: Session, confirmation_id: uuid.UUID) -> Confirmation:
     conf = db.get(Confirmation, confirmation_id)
     if conf is None:
-        raise NotFoundError(f"confirmation {confirmation_id} not found", code="confirmation_not_found")
+        raise NotFoundError(
+            f"confirmation {confirmation_id} not found", code="confirmation_not_found"
+        )
     return conf
 
 
@@ -60,9 +62,13 @@ def _execute(db: Session, user: User, conf: Confirmation) -> dict:
     if conf.action == "create_part":
         from app.models.numbering import PartClass
 
-        class_id = db.execute(select(PartClass.id).where(PartClass.code == payload.class_code)).scalar_one_or_none()
+        class_id = db.execute(
+            select(PartClass.id).where(PartClass.code == payload.class_code)
+        ).scalar_one_or_none()
         if class_id is None:
-            raise NotFoundError(f"part class '{payload.class_code}' not found", code="class_not_found")
+            raise NotFoundError(
+                f"part class '{payload.class_code}' not found", code="class_not_found"
+            )
         part = part_service.create_part(
             db,
             user=user,
@@ -76,7 +82,9 @@ def _execute(db: Session, user: User, conf: Confirmation) -> dict:
         return {"part_number": part.part_number}
     if conf.action == "create_revision":
         part = get_part_by_number(db, payload.part_number)
-        rev = part_service.create_revision(db, user=user, part=part, change_reason=payload.change_reason)
+        rev = part_service.create_revision(
+            db, user=user, part=part, change_reason=payload.change_reason
+        )
         return {"part_number": part.part_number, "revision": rev.revision}
     if conf.action == "transition_revision":
         rev = get_revision_or_404(db, uuid.UUID(payload.revision_id))
@@ -95,7 +103,9 @@ def _execute(db: Session, user: User, conf: Confirmation) -> dict:
         from app.services import document_service
 
         doc = document_service.get_document(db, payload.doc_number)
-        rev = document_service.create_doc_revision(db, user=user, doc=doc, change_reason=payload.change_reason)
+        rev = document_service.create_doc_revision(
+            db, user=user, doc=doc, change_reason=payload.change_reason
+        )
         return {"doc_number": doc.doc_number, "revision": rev.revision}
     if conf.action == "link_document":
         from app.services import document_service
@@ -111,14 +121,18 @@ def _execute(db: Session, user: User, conf: Confirmation) -> dict:
 
         rev = db.get(DocRevision, uuid.UUID(payload.revision_id))
         if rev is None:
-            raise NotFoundError(f"doc revision {payload.revision_id} not found", code="revision_not_found")
+            raise NotFoundError(
+                f"doc revision {payload.revision_id} not found", code="revision_not_found"
+            )
         rev = document_service.transition_doc_revision(
             db, user=user, rev=rev, to_status=payload.to_status, reason=payload.reason
         )
         return {"revision_id": str(rev.id), "status": rev.status}
     if conf.action == "add_bom_item":
         parent_rev = get_revision_or_404(db, uuid.UUID(payload.parent_rev_id))
-        component_rev = resolve_component_revision(db, payload.component_part_number, payload.component_revision)
+        component_rev = resolve_component_revision(
+            db, payload.component_part_number, payload.component_revision
+        )
         item = add_bom_item(
             db,
             parent_rev=parent_rev,
@@ -129,13 +143,61 @@ def _execute(db: Session, user: User, conf: Confirmation) -> dict:
         )
         db.commit()
         return {"bom_item_id": str(item.id)}
+    if conf.action == "create_ecr":
+        from app.services import change_service
+
+        ecr = change_service.create_ecr(
+            db, user=user, description=payload.description, reason=payload.reason
+        )
+        return {"ecr_number": ecr.number}
+    if conf.action == "transition_ecr":
+        from app.services import change_service
+
+        ecr = change_service.get_ecr_by_number(db, payload.ecr_number)
+        ecr = change_service.transition_ecr(
+            db, user=user, ecr=ecr, to_status=payload.to_status, reason=payload.reason
+        )
+        return {"ecr_number": ecr.number, "status": ecr.status}
+    if conf.action == "create_eco":
+        from app.services import change_service
+
+        ecr = change_service.get_ecr_by_number(db, payload.ecr_number)
+        eco = change_service.create_eco(db, user=user, ecr=ecr, reason=payload.reason)
+        return {"eco_number": eco.number}
+    if conf.action == "transition_eco":
+        from app.services import change_service
+
+        eco = change_service.get_eco_by_number(db, payload.eco_number)
+        eco = change_service.transition_eco(
+            db, user=user, eco=eco, to_status=payload.to_status, reason=payload.reason
+        )
+        return {"eco_number": eco.number, "status": eco.status}
+    if conf.action == "eco_add_affected":
+        from app.services import change_service
+
+        eco = change_service.get_eco_by_number(db, payload.eco_number)
+        rev = change_service.add_affected_revision(
+            db,
+            user=user,
+            eco=eco,
+            part_number=payload.part_number,
+            revision=payload.revision,
+            reason=payload.reason,
+        )
+        return {
+            "eco_number": eco.number,
+            "revision_id": str(rev.id),
+            "part_number": payload.part_number,
+        }
     raise ValidationError(f"unknown confirmation action '{conf.action}'", code="unknown_action")
 
 
 def resolve(db: Session, *, user: User, confirmation_id: uuid.UUID, approve: bool) -> Confirmation:
     conf = get_confirmation(db, confirmation_id)
     if conf.status != "proposed":
-        raise ConflictError(f"confirmation is already '{conf.status}'", code="confirmation_resolved")
+        raise ConflictError(
+            f"confirmation is already '{conf.status}'", code="confirmation_resolved"
+        )
     if _as_utc(conf.expires_at) < datetime.now(UTC):
         conf.status = "expired"
         db.commit()

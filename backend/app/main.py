@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import select
 
-from app.api import admin, auth, bom, confirmations, documents, parts, revisions
+from app.api import admin, auth, bom, changes, confirmations, documents, parts, revisions
 from app.core import security
 from app.core.config import get_settings
 from app.core.db import SessionLocal, engine
@@ -52,6 +52,7 @@ app.include_router(parts.router, prefix=API)
 app.include_router(revisions.router, prefix=API)
 app.include_router(bom.router, prefix=API)
 app.include_router(documents.router, prefix=API)
+app.include_router(changes.router, prefix=API)
 app.include_router(confirmations.router, prefix=API)
 app.include_router(admin.router, prefix=API)
 
