@@ -31,6 +31,10 @@ project document "PLM-System Blueprint". Rules for agents:
       affected (released-only, 409 `affected_not_released`) part revision, inheriting attributes+BOM,
       `change_reason` references ECO/ECR, idempotent via the workflow matrix, fully audited;
       see docs/changes.md
+- [x] M10 Phase-2 agent service: `agent/` runs as its own compose service (port 8001) with
+      `POST /chat` (SSE stream: tool calls, 202 proposals, answer) and conversation persistence
+      via `POST/GET /api/v1/agent/conversations*` (migration 0005, owner-scoped); CLI is a thin
+      client with `--service-url`; `/api/v1/agent/*` is excluded from the LLM tool catalog
 
 ## Quickstart
 
@@ -97,6 +101,18 @@ Runbooks: docs/runbooks/.
 The agent only calls documented API endpoints (tools from /openapi.json), writes
 always come back as 202 + confirmation token and are approved by the human via
 `POST /api/v1/confirmations/{id}/approve`.
+
+### Agent service (M10)
+
+    docker compose up -d agent        # http://localhost:8001
+    curl -N -X POST http://localhost:8001/chat -H 'Content-Type: application/json' \
+         -d '{"message": "Suche alle TEST-Teile"}'
+    # SSE events: conversation -> tool_call* -> delta -> done -> end
+    # CLI as thin client: AGENT_SERVICE_URL=http://localhost:8001 python -m plm_agent "..."
+
+Conversations persist in the backend (`/api/v1/agent/conversations*`, migration 0005,
+owned by the agent service account). If `AGENT_SERVICE_TOKEN` is set, clients must send
+it as `X-Agent-Token`. The service is internal — do not expose it publicly.
 
 ## Updates & dependencies
 
