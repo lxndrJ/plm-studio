@@ -20,6 +20,10 @@ updates:
     directory: "/frontend"
     schedule:
       interval: "weekly"
+    # stay on the proven node 22 LTS line; major jumps need a deliberate test
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
