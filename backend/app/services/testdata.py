@@ -103,11 +103,12 @@ def ensure_test_class(db: Session) -> PartClass:
 
 
 def _system_user(db: Session) -> User:
-    user = db.execute(
-        select(User).where(User.role == "admin").order_by(User.email)
-    ).scalar_one_or_none()
+    # .first(), not scalar_one_or_none(): there may be several admins
+    user = (
+        db.execute(select(User).where(User.role == "admin").order_by(User.email)).scalars().first()
+    )
     if user is None:
-        user = db.execute(select(User).order_by(User.email)).scalar_one_or_none()
+        user = db.execute(select(User).order_by(User.email)).scalars().first()
     if user is None:
         from app.core import security
 
