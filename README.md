@@ -21,7 +21,8 @@ project document "PLM-System Blueprint". Rules for agents:
       affected part revisions on the ECO, confirmation-token path for all writes; models + matrix were already in place)
 - [x] M6 Report engine (Typst): versioned PDF reports (`RPT-...`) with frozen `content_snapshot`,
       released-only content filter (internal attributes like preis/lieferant stripped), PDF download, confirmation-token path
-- [ ] M7 AI layer (LiteLLM, tools from /openapi.json, guardrails)
+- [x] M7 AI layer (agent/: tools generated from /openapi.json via `plm_agent.toolgen`,
+      ReAct runner via LiteLLM, guardrails: no `direct` writes, never self-approve confirmations, 429/5xx backoff)
 
 ## Quickstart
 
@@ -74,6 +75,18 @@ test walkthrough.
 
 Decisions and rationale: docs/adr/. Number ranges: docs/number-ranges.md.
 Runbooks: docs/runbooks/.
+
+## AI agent (M7)
+
+    pip install -e "agent[dev]"
+    # tool definitions from the running API schema:
+    python -m plm_agent.toolgen --openapi http://localhost:8000/openapi.json   # writes agent/tools/tools.json
+    # one prompt through the agent loop (env: PLM_API_URL, OPENAI_BASE_URL, OPENAI_API_KEY, LLM_MODEL, PLM_AGENT_EMAIL, PLM_AGENT_PASSWORD):
+    python -m plm_agent "Suche alle TEST-Teile und lege 'Neues Teil' als Aenderungsvorschlag an"
+
+The agent only calls documented API endpoints (tools from /openapi.json), writes
+always come back as 202 + confirmation token and are approved by the human via
+`POST /api/v1/confirmations/{id}/approve`.
 
 ## Updates & dependencies
 

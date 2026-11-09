@@ -28,7 +28,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e "backend[dev]"
-      - run: ruff check backend
+      - run: pip install -e "agent[dev]"
+      - run: ruff check backend agent
+      - name: Agent tests
+        run: pytest agent/tests
       - name: Alembic Migration gegen frische Test-DB
         run: |
           alembic -c backend/alembic.ini upgrade head
