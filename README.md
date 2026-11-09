@@ -26,13 +26,16 @@ project document "PLM-System Blueprint". Rules for agents:
 ## Quickstart
 
     cp .env.example .env
-    docker compose up -d db
+    docker compose up -d --build   # one-shot 'migrate' service runs alembic upgrade head before the API starts
+    # API docs: http://localhost:8000/docs
+
+Local without Docker:
+
     cd backend
     python -m venv .venv && source .venv/bin/activate
     pip install -e ".[dev]"
-    alembic upgrade head
+    alembic upgrade head          # before the first app start (schema only via Alembic)
     uvicorn app.main:app --reload
-    # API docs: http://localhost:8000/docs
 
 Tests (run locally on SQLite, no Docker):
 
