@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     BOOTSTRAP_ADMIN_PASSWORD: str = "admin"
     STORAGE_DIR: str = "./data/files"
     CONFIRMATION_TTL_HOURS: int = 24
+    TYPST_BINARY: str = "typst"
 
 
 @lru_cache

@@ -35,9 +35,10 @@ Blueprint and milestones M0-M7: see README.md and docs/.
 9. Part classes form a tree via part_classes.parent_id. Class filters in
    search include the whole subtree; unknown class codes are 404.
 
-## Next milestone (M6)
+## Next milestone (M7)
 
-Report engine (Typst); then AI layer (M7). M1-M5 are implemented incl. tests
-(backend/tests, running on SQLite). M5 added the ECR/ECO endpoints
-(app/api/changes.py, app/services/change_service.py): ECO only from an
-approved ECR, affected part revisions only editable while the ECO is draft.
+AI layer (LiteLLM, tools generated from /openapi.json, guardrails).
+M1-M6 are implemented incl. tests (backend/tests, running on SQLite).
+M6 added the report engine (app/api/reports.py, app/services/report_service.py):
+PDF via Typst (TYPST_BINARY), frozen content_snapshot per report, released-only
+content, internal attribute keys (preis/lieferant/...) stripped.
