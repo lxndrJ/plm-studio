@@ -35,6 +35,12 @@ project document "PLM-System Blueprint". Rules for agents:
       `POST /chat` (SSE stream: tool calls, 202 proposals, answer) and conversation persistence
       via `POST/GET /api/v1/agent/conversations*` (migration 0005, owner-scoped); CLI is a thin
       client with `--service-url`; `/api/v1/agent/*` is excluded from the LLM tool catalog
+- [x] M11 Phase-2 UI/reports/export: `/agent` chat page (SSE stream, inline proposal approval),
+      `/admin` page (users/roles/active, password reset, classes with typed attribute defs, audit
+      log, stats), typed attribute form on part detail (`PATCH .../attributes`, draft-only),
+      document preview pane, list pagination + type/status filters + CSV/JSON export
+      (`/export/parts`, `/export/bom/{pn}`), BOM-explosion + ECR/ECO PDF report templates,
+      confirmations badge in nav, `/admin/stats` now requires auth
 
 ## Quickstart
 

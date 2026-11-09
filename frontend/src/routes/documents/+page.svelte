@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { api, download, type Document, type DocumentSummary } from "$lib/api/client";
+  import { api, download, fetchBlobUrl, type Document, type DocumentSummary } from "$lib/api/client";
   import Badge from "$lib/components/Badge.svelte";
 
   let docs: DocumentSummary[] = [];
@@ -14,6 +14,26 @@
   let openNr: string | null = null;
   let openDoc: Document | null = null;
   let fileInput: HTMLInputElement;
+  let previewUrl: string | null = null;
+  let previewMime = "";
+  let previewFor: string | null = null;
+
+  async function togglePreview(fileId: string, mime: string): Promise<void> {
+    if (previewFor === fileId) {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+      previewFor = null;
+      return;
+    }
+    try {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = await fetchBlobUrl(`/doc-files/${fileId}/preview`);
+      previewMime = mime;
+      previewFor = fileId;
+    } catch (e: any) {
+      error = e?.message;
+    }
+  }
 
   async function load(): Promise<void> {
     error = "";
@@ -142,8 +162,20 @@
                     <div class="row" style="margin: 4px 0 4px 16px">
                       <span class="small">{f.filename}</span>
                       <span class="muted small mono">{f.mime_type}</span>
+                      <button class="btn btn-ghost btn-sm" on:click={() => togglePreview(f.id, f.mime_type)}>👁 Vorschau</button>
                       <button class="btn btn-ghost btn-sm" on:click={() => download(`/doc-files/${f.id}/download`, f.filename)}>↓</button>
                     </div>
+                    {#if previewFor === f.id && previewUrl}
+                      <div class="preview-pane">
+                        {#if previewMime.startsWith("image/") || previewMime === "image/svg+xml"}
+                          <img src={previewUrl} alt={f.filename} />
+                        {:else if previewMime === "application/pdf"}
+                          <iframe src={previewUrl} title={f.filename} style="width: 100%; height: 70vh; border: 0"></iframe>
+                        {:else}
+                          <div class="empty">Keine Inline-Vorschau für {previewMime} — bitte herunterladen.</div>
+                        {/if}
+                      </div>
+                    {/if}
                   {/each}
                 {/each}
                 <div class="row" style="margin-top: 10px">

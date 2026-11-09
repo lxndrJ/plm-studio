@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
-  import { api, type BomItem, type Part, type WhereUsed } from "$lib/api/client";
+  import { api, type BomItem, type ClassAttribute, type Part, type PartClass, type WhereUsed } from "$lib/api/client";
   import Badge from "$lib/components/Badge.svelte";
   import TransitionBar from "$lib/components/TransitionBar.svelte";
 
@@ -15,6 +15,13 @@
   let notice = "";
   let newRevReason = "";
   let bomRev = "";
+  let classes: PartClass[] = [];
+  let attrForm: Record<string, any> = {};
+  let attrReason = "";
+
+  $: attrClass = part ? classes.find((c) => c.id === part!.class_id) : undefined;
+  $: attrDefs = (attrClass?.attributes ?? []) as ClassAttribute[];
+  $: draftRev = part ? [...part.revisions].reverse().find((r) => r.status === "draft") : undefined;
 
   const revTransitions: Record<string, { to: string; label: string }[]> = {
     draft: [{ to: "review", label: "→ Review" }, { to: "obsolete", label: "→ Obsolete" }],
@@ -30,9 +37,30 @@
       if (!bomRev && part.revisions.length > 0) bomRev = part.revisions[part.revisions.length - 1].revision;
       await loadBom();
       whereUsed = await api.whereUsed(pn);
+      if (classes.length === 0) classes = await api.partClasses();
+      const draft = [...part.revisions].reverse().find((r) => r.status === "draft");
+      attrForm = draft ? { ...(draft.attributes ?? {}) } : {};
     } catch (e: any) {
       error = e?.message ?? "Fehler beim Laden";
     }
+  }
+
+  async function saveAttributes(): Promise<void> {
+    if (!draftRev) return;
+    error = "";
+    notice = "";
+    try {
+      await api.updateAttributes(pn, draftRev.id, attrForm, attrReason || undefined);
+      notice = `Attribute von Rev ${draftRev.revision} gespeichert.`;
+      attrReason = "";
+      await load();
+    } catch (e: any) {
+      error = e?.message;
+    }
+  }
+
+  function setAttr(key: string, value: any): void {
+    attrForm = { ...attrForm, [key]: value };
   }
 
   async function loadBom(): Promise<void> {
@@ -165,6 +193,45 @@
       {/if}
     </div>
   </div>
+  {#if part && attrDefs.length > 0}
+    <div class="card" style="margin-top: 14px">
+      <div class="section-title">
+        <h3>Attribute {#if attrClass}(Klasse {attrClass.code}){/if}</h3>
+        {#if draftRev}<span class="muted small">bearbeitbar in Rev {draftRev.revision} (draft)</span>{:else}<span class="muted small">nur in draft-Revisionen bearbeitbar</span>{/if}
+      </div>
+      {#if draftRev}
+        <div class="attr-grid">
+          {#each attrDefs as a}
+            <div class="attr-field">
+              <label for="attr-{a.key}">{a.label} ({a.key}){a.required ? " *" : ""}{a.unit_code ? ` [${a.unit_code}]` : ""}</label>
+              {#if a.attr_type === "enum"}
+                <select id="attr-{a.key}" class="select" value={attrForm[a.key] ?? ""} on:change={(e) => setAttr(a.key, e.currentTarget.value || null)}>
+                  <option value="">—</option>
+                  {#each a.allowed_values ?? [] as v}<option value={v}>{v}</option>{/each}
+                </select>
+              {:else if a.attr_type === "boolean"}
+                <input id="attr-{a.key}" type="checkbox" checked={attrForm[a.key] === true} on:change={(e) => setAttr(a.key, e.currentTarget.checked)} />
+              {:else if a.attr_type === "number"}
+                <input id="attr-{a.key}" class="input" type="number" step="any" value={attrForm[a.key] ?? ""} on:input={(e) => setAttr(a.key, e.currentTarget.value === "" ? null : Number(e.currentTarget.value))} />
+              {:else}
+                <input id="attr-{a.key}" class="input" value={attrForm[a.key] ?? ""} on:input={(e) => setAttr(a.key, e.currentTarget.value)} />
+              {/if}
+            </div>
+          {/each}
+        </div>
+        <div class="row" style="margin-top: 12px">
+          <input class="input input-sm" style="width: 220px" placeholder="Grund für Attribut-Änderung" bind:value={attrReason} />
+          <button class="btn btn-primary btn-sm" on:click={saveAttributes}>Attribute speichern</button>
+        </div>
+      {:else}
+        <div class="empty">Lege zuerst eine draft-Revision an, um Attribute zu bearbeiten.</div>
+      {/if}
+      {#if draftRev && Object.keys(draftRev.attributes ?? {}).length > 0}
+        <div class="section-title" style="margin-top: 14px"><h3>Aktuelle Werte (Rev {draftRev.revision})</h3></div>
+        <pre class="json">{JSON.stringify(draftRev.attributes, null, 2)}</pre>
+      {/if}
+    </div>
+  {/if}
 {:else if !error}
   <div class="empty">Lade …</div>
 {/if}

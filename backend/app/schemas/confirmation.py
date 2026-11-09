@@ -86,7 +86,16 @@ class EcoAddAffectedPayload(BaseModel):
 
 
 class CreateReportPayload(BaseModel):
+    template: str = "part_sheet_v1"
+    part_number: str | None = None
+    ecr_number: str | None = None
+    reason: str | None = None
+
+
+class UpdateRevisionAttributesPayload(BaseModel):
     part_number: str
+    revision_id: uuid.UUID
+    attributes: dict = Field(default_factory=dict)
     reason: str | None = None
 
 
@@ -105,6 +114,7 @@ ACTION_SCHEMAS = {
     "transition_eco": TransitionEcoPayload,
     "eco_add_affected": EcoAddAffectedPayload,
     "create_report": CreateReportPayload,
+    "update_revision_attributes": UpdateRevisionAttributesPayload,
 }
 
 
@@ -131,6 +141,7 @@ ConfirmationPayload = (
     | TransitionEcoPayload
     | EcoAddAffectedPayload
     | CreateReportPayload
+    | UpdateRevisionAttributesPayload
 )
 
 
