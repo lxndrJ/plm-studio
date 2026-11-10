@@ -2,7 +2,7 @@
 
 Project: PLM Studio (in-house PLM with AI prompt layer).
 Stack: FastAPI (Python 3.12) + PostgreSQL 16 + Alembic + SvelteKit.
-Blueprint and milestones M0-M7: see README.md and docs/.
+Blueprint and milestones M0-M11: see README.md and docs/. Phase 3 plan (M12+): docs/phase-3.md.
 
 ## Working style
 
@@ -37,8 +37,14 @@ Blueprint and milestones M0-M7: see README.md and docs/.
 
 ## Milestones
 
-M0-M7 are implemented incl. tests (backend/tests on SQLite, agent/tests with
-mocked LLM/API). M7 added the AI agent (agent/plm_agent): toolgen maps
-/openapi.json to function-calling tools (writes without `direct`, no
-auth/approve/admin endpoints), the runner loops via LiteLLM and reports 202
-proposals back instead of self-approving.
+Phase 1 (M0-M7) is implemented incl. tests (backend/tests on SQLite,
+agent/tests with mocked LLM/API). M7 added the AI agent (agent/plm_agent):
+toolgen maps /openapi.json to function-calling tools (writes without
+`direct`, no auth/approve/admin endpoints), the runner loops via LiteLLM and
+reports 202 proposals back instead of self-approving.
+
+Phase 2 (M8-M11) is implemented incl. tests: M8 security/user management,
+M9 ECO execution, M10 agent service (SSE chat API + conversation persistence,
+compose service :8001), M11 UI/reports/export (chat + admin pages, typed
+attribute forms, CSV/JSON export, BOM-explosion + ECR report templates).
+Phase 3 (M12+) is planned in docs/phase-3.md.
