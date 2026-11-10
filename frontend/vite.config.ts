@@ -7,7 +7,8 @@ const proxy = {
   "/api": apiTarget,
   "/openapi.json": apiTarget,
   "/health": apiTarget,
-  "/agent-api": agentTarget,
+  // the agent service serves /chat, /conversations (no prefix) — strip /agent-api
+  "/agent-api": { target: agentTarget, rewrite: (path) => path.replace(/^\/agent-api/, "") },
 };
 
 export default defineConfig({
