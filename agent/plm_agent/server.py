@@ -12,6 +12,7 @@ clients must send it as X-Agent-Token header (the service is internal, not publi
 """
 
 import json
+import logging
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -22,6 +23,7 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from plm_agent.logbuf import install_logging, recent_logs
 from plm_agent.runner import PlmAgent
 from plm_agent.toolgen import ToolCatalog, generate
 
@@ -127,6 +129,17 @@ def create_app(
             body={"role": role, "content": content},
         )
 
+    install_logging()
+
+    @app.get("/logs")
+    def logs(
+        lines: int = 200,
+        level: str = "INFO",
+        x_agent_token: Annotated[str | None, Header()] = None,
+    ):
+        check_token(x_agent_token)
+        return {"service": "agent", "level": level, "logs": recent_logs(lines=lines, level=level)}
+
     @app.exception_handler(httpx.HTTPError)
     async def httpx_error_handler(_request, exc: httpx.HTTPError):
         return JSONResponse(
@@ -178,6 +191,9 @@ def create_app(
         conversation_id = conv["id"]
         history = [_to_llm_message(m) for m in conv.get("messages", [])]
 
+        log = logging.getLogger("plm_agent.chat")
+        log.info("chat start conversation=%s message=%r", conversation_id, body.message[:120])
+
         def stream():
             yield _sse({"type": "conversation", "conversation_id": conversation_id})
             try:
@@ -185,6 +201,9 @@ def create_app(
                 done = None
                 for event in a.run_events(body.message, history=history):
                     if event["type"] == "tool_call":
+                        log.info(
+                            "tool_call %s -> %s", event["name"], json.dumps(event["result"])[:300]
+                        )
                         _add_message(
                             a,
                             conversation_id,
@@ -199,8 +218,14 @@ def create_app(
                         done = event
                     yield _sse(event)
                 if done is not None:
+                    log.info(
+                        "chat done conversation=%s answer_len=%d",
+                        conversation_id,
+                        len(done["content"]),
+                    )
                     _add_message(a, conversation_id, "assistant", {"text": done["content"]})
             except Exception as e:  # noqa: BLE001 - stream already started: report as SSE error event
+                log.error("chat stream failed: %s: %s", type(e).__name__, e)
                 yield _sse({"type": "error", "message": f"{type(e).__name__}: {e}"})
             yield _sse({"type": "end"})
 

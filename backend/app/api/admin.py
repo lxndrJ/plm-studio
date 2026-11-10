@@ -131,6 +131,13 @@ def audit_log(db: DbSession, limit: int = 100):
     ]
 
 
+@router.get("/logs", dependencies=[Depends(require_admin)])
+def logs(lines: int = 200, level: str = "INFO"):
+    from app.core.logging import recent_logs
+
+    return {"service": "api", "level": level, "logs": recent_logs(lines=lines, level=level)}
+
+
 @router.get("/stats")
 def stats(db: DbSession, user: CurrentUser):
     return {

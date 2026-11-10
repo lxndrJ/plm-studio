@@ -16,6 +16,7 @@
     { href: "/reports", label: "Reports", icon: "○" },
     { href: "/documents", label: "Dokumente", icon: "🗎" },
     { href: "/agent", label: "Agent", icon: "✦" },
+    { href: "/logs", label: "Logs", icon: "≣" },
     { href: "/admin", label: "Admin", icon: "⚙", adminOnly: true },
   ];
 

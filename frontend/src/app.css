@@ -189,3 +189,14 @@ pre.json {
 .preview-pane { margin-top: 10px; border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; background: #0a0f16; text-align: center; }
 .preview-pane img, .preview-pane iframe { max-width: 100%; display: block; margin: 0 auto; }
 .pager { display: flex; gap: 8px; align-items: center; margin-top: 12px; color: var(--muted); font-size: 13px; }
+.log-view { font-family: ui-monospace, Menlo, monospace; font-size: 12px; max-height: 65vh; overflow: auto; background: #0a0f16; border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 8px 0; }
+.log-line { display: flex; gap: 8px; padding: 2px 12px; white-space: pre-wrap; word-break: break-word; }
+.log-ts { color: var(--muted); flex: none; }
+.log-level { flex: none; width: 64px; font-weight: 700; }
+.log-logger { color: var(--muted); flex: none; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.log-msg { flex: 1; }
+.log-err { color: #fca5a5; } .log-err .log-level { color: var(--red); }
+.log-warn { color: #fcd34d; } .log-warn .log-level { color: var(--amber); }
+.log-info .log-level { color: var(--accent-2); }
+.log-meta { margin-bottom: 8px; }
+.msg.error { align-self: flex-start; background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.5); color: #fecaca; }
