@@ -278,3 +278,55 @@ def test_llm_request_uses_bearer_api_key_and_chat_completions():
     agent._llm([{"role": "user", "content": "hi"}])
     assert captured["url"] == "https://api.mistral.ai/v1/chat/completions"
     assert captured["auth"] == "Bearer mstrl-test-only"
+
+
+def test_llm_omits_tools_key_when_catalog_empty():
+    """Providers like Mistral reject "tools": [] with 400 — omit the key entirely."""
+    state = {"requests": []}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        state["requests"].append((request.method, str(request.url), request.content))
+        if str(request.url).endswith("/chat/completions"):
+            return httpx.Response(200, json=_llm_response(content="ok"))
+        return httpx.Response(404, json={})
+
+    agent = PlmAgent(
+        plm_base_url="http://plm.test",
+        llm_base_url="http://llm.test/v1",
+        api_key="k",
+        model="m",
+        email="a@b.c",
+        password="pw",
+        catalog=ToolCatalog([], {}),
+        system_prompt="s",
+        transport=httpx.MockTransport(handler),
+    )
+    agent._llm([{"role": "user", "content": "hi"}])
+    body = json.loads(state["requests"][0][2])
+    assert "tools" not in body
+    assert body["messages"][0]["content"] == "hi"
+
+
+def test_llm_error_message_includes_provider_body():
+    import pytest
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).endswith("/chat/completions"):
+            return httpx.Response(400, json={"message": "Invalid model name: foo-bar"})
+        return httpx.Response(404, json={})
+
+    agent = PlmAgent(
+        plm_base_url="http://plm.test",
+        llm_base_url="https://api.mistral.ai/v1",
+        api_key="k",
+        model="foo-bar",
+        email="a@b.c",
+        password="pw",
+        catalog=ToolCatalog([], {}),
+        system_prompt="s",
+        transport=httpx.MockTransport(handler),
+    )
+    with pytest.raises(httpx.HTTPStatusError) as exc:
+        agent._llm([{"role": "user", "content": "hi"}])
+    assert "400" in str(exc.value)
+    assert "Invalid model name: foo-bar" in str(exc.value)

@@ -159,3 +159,25 @@ def test_real_app_openapi_schema():
         if name.startswith(("post_", "put_", "delete_")):
             assert "direct" not in tool["function"]["parameters"]["properties"], name
     assert not any("login" in n or "approve" in n or "reject" in n for n in names)
+
+
+def test_header_parameters_are_not_tool_arguments():
+    openapi = {
+        "openapi": "3.1.0",
+        "info": {"title": "t", "version": "1"},
+        "paths": {
+            "/api/v1/parts": {
+                "get": {
+                    "parameters": [
+                        {"name": "Authorization", "in": "header", "schema": {"type": "string"}},
+                        {"name": "query", "in": "query", "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "ok"}},
+                }
+            }
+        },
+    }
+    cat = generate(openapi)
+    props = cat.tools[0]["function"]["parameters"]["properties"]
+    assert "Authorization" not in props
+    assert "query" in props

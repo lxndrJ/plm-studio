@@ -79,12 +79,22 @@ class PlmAgent:
         return last
 
     def _llm(self, messages: list[dict]) -> dict:
+        payload: dict = {"model": self.model, "messages": messages}
+        if self.catalog.tools:
+            # some providers (e.g. Mistral) reject an empty tools array with 400
+            payload["tools"] = self.catalog.tools
         r = self._http.post(
             self.llm_url,
             headers={"Authorization": f"Bearer {self.api_key}"},
-            json={"model": self.model, "messages": messages, "tools": self.catalog.tools},
+            json=payload,
         )
-        r.raise_for_status()
+        if r.status_code >= 400:
+            # include the provider's error body so the SSE error event shows the real reason
+            raise httpx.HTTPStatusError(
+                f"LLM returned {r.status_code} for {self.llm_url}: {r.text[:500]}",
+                request=r.request,
+                response=r,
+            )
         return r.json()["choices"][0]["message"]
 
     def _execute_tool(self, call: dict) -> dict:
@@ -116,6 +126,12 @@ class PlmAgent:
                 "note": "proposed write, not committed; the user must approve via POST /api/v1/confirmations/{id}/approve - never approve yourself",
             }
         return {"status": r.status_code, "body": payload}
+
+    def fetch_openapi(self) -> dict:
+        """GET the PLM API's /openapi.json through the agent's own HTTP client."""
+        r = self._http.get(self.plm_base_url.rstrip("/") + "/openapi.json")
+        r.raise_for_status()
+        return r.json()
 
     def api_request(self, method: str, path: str, *, params=None, body=None) -> httpx.Response:
         """Public wrapper around the authenticated PLM request with backoff

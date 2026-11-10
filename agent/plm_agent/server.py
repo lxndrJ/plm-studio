@@ -131,6 +131,19 @@ def create_app(
 
     install_logging()
 
+    @app.post("/reload-tools")
+    def reload_tools(x_agent_token: Annotated[str | None, Header()] = None):
+        """Re-fetch the tool catalog from the PLM API's /openapi.json (use when the
+        API was not reachable when the agent was first built)."""
+        check_token(x_agent_token)
+        a = get_agent()
+        tools_file = AGENT_ROOT / "tools" / "tools.json"
+        if tools_file.exists():
+            a.catalog = ToolCatalog.from_dict(json.loads(tools_file.read_text(encoding="utf-8")))
+        else:
+            a.catalog = generate(a.fetch_openapi())
+        return {"tools": len(a.catalog.tools)}
+
     @app.get("/logs")
     def logs(
         lines: int = 200,

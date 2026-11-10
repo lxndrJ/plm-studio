@@ -283,3 +283,34 @@ def test_build_agent_uses_openai_base_url_from_env(monkeypatch):
     assert agent.plm_base_url == "http://plm.test"
     assert agent.model == "mistral-large-latest"
     assert agent.api_key == "mstrl-test-only"
+
+
+def test_reload_tools_refetches_catalog_from_api():
+    state = {"requests": [], "openapi": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url.endswith("/api/v1/auth/login"):
+            return httpx.Response(200, json={"access_token": "tok"})
+        if url.endswith("/openapi.json"):
+            state["openapi"] += 1
+            return httpx.Response(
+                200,
+                json={
+                    "openapi": "3.1.0",
+                    "info": {"title": "t", "version": "1"},
+                    "paths": {"/api/v1/parts": {"get": {"parameters": [], "responses": {}}}},
+                },
+            )
+        return httpx.Response(404, json={})
+
+    from plm_agent.toolgen import ToolCatalog
+
+    agent = _make_agent(state, httpx.MockTransport(handler))
+    agent.catalog = ToolCatalog([], {})
+    client = TestClient(create_app(agent=agent))
+    r = client.post("/reload-tools")
+    assert r.status_code == 200, r.text
+    assert r.json()["tools"] == 1
+    assert len(agent.catalog.tools) == 1
+    assert state["openapi"] == 1

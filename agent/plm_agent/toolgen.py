@@ -27,6 +27,8 @@ def _parameters_schema(method: str, op: dict) -> dict:
     properties: dict = {}
     required: list[str] = []
     for prm in op.get("parameters", []):
+        if prm.get("in") == "header":
+            continue  # never expose headers (authorization) as tool arguments
         properties[prm["name"]] = prm.get("schema", {})
         if prm.get("required"):
             required.append(prm["name"])
