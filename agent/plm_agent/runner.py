@@ -16,6 +16,31 @@ import httpx
 WRITE_METHODS = ("POST", "PUT", "PATCH")
 
 
+def sanitize_history(messages: list[dict]) -> list[dict]:
+    """Make a stored conversation valid for chat-completions providers:
+    tool messages are only allowed right after the assistant message that made
+    the tool calls. Orphan tool messages are dropped; a trailing assistant
+    message with unanswered tool_calls gets them stripped."""
+    out: list[dict] = []
+    pending: set[str] = set()
+    for m in messages:
+        role = m.get("role")
+        if role == "assistant" and m.get("tool_calls"):
+            pending = {c.get("id", "") for c in m["tool_calls"]}
+            out.append(m)
+        elif role == "tool":
+            if m.get("tool_call_id") in pending:
+                pending.discard(m["tool_call_id"])
+                out.append(m)
+            # orphan tool message (its assistant tool_call message is missing) -> drop
+        else:
+            pending = set()
+            out.append(m)
+    if out and out[-1].get("role") == "assistant" and out[-1].get("tool_calls") and pending:
+        out[-1] = {k: v for k, v in out[-1].items() if k != "tool_calls"}
+    return out
+
+
 class PlmAgent:
     def __init__(
         self,
@@ -155,6 +180,8 @@ class PlmAgent:
         messages.append({"role": "user", "content": user_prompt})
         for _ in range(self.max_steps):
             message = self._llm(messages)
+            if message.get("content") is None:
+                message["content"] = ""  # some providers reject null content
             messages.append(message)
             calls = message.get("tool_calls") or []
             if not calls:
