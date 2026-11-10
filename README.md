@@ -120,6 +120,12 @@ Conversations persist in the backend (`/api/v1/agent/conversations*`, migration 
 owned by the agent service account). If `AGENT_SERVICE_TOKEN` is set, clients must send
 it as `X-Agent-Token`. The service is internal — do not expose it publicly.
 
+LLM endpoint: default is the local LiteLLM proxy (`OPENAI_BASE_URL=http://litellm:4000/v1`,
+`LLM_MODEL=plm-chat`). A direct provider also works — e.g. Mistral:
+`OPENAI_BASE_URL=https://api.mistral.ai/v1`, `OPENAI_API_KEY=<key>`,
+`LLM_MODEL=mistral-large-latest` (real keys only in the local `.env`, never committed;
+see `.env.example`). The runner normalizes the base URL to `.../v1/chat/completions`.
+
 ## Updates & dependencies
 
 - Python deps (`backend/pyproject.toml`), Docker base images and GitHub
