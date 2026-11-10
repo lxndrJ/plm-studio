@@ -87,7 +87,8 @@ services:
       dockerfile: agent/Dockerfile
     environment:
       PLM_API_URL: http://api:8000
-      OPENAI_BASE_URL: http://litellm:4000/v1
+      # passthrough from .env — direct provider (e.g. https://api.mistral.ai/v1) or litellm proxy (default)
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-http://litellm:4000/v1}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       LLM_MODEL: ${LLM_MODEL:-plm-chat}
       PLM_AGENT_EMAIL: ${PLM_AGENT_EMAIL}
@@ -98,8 +99,7 @@ services:
     depends_on:
       api:
         condition: service_started
-      litellm:
-        condition: service_started
+    # NOTE: no depends_on litellm — with a direct LLM provider the proxy is optional
     restart: unless-stopped
 
   litellm:
