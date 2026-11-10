@@ -27,12 +27,25 @@ class PartClassCreate(BaseModel):
     parent_code: str | None = None
 
 
+class ClassAttributeResponse(BaseModel):
+    key: str
+    label: str
+    attr_type: str
+    unit_code: str | None = None
+    required: bool
+    allowed_values: list | None = None
+
+    class Config:
+        from_attributes = True
+
+
 class PartClassResponse(BaseModel):
     id: uuid.UUID
     code: str
     name: str
     default_attributes: dict
     parent_id: uuid.UUID | None = None
+    attributes: list[ClassAttributeResponse] = []
 
     class Config:
         from_attributes = True

@@ -1,5 +1,5 @@
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, aliased
 
 from app.core.errors import ConflictError, NotFoundError
 from app.models.bom import BomItem
@@ -205,16 +205,97 @@ def _class_subtree_ids(db: Session, class_code: str) -> list:
     return list(ids)
 
 
-def search_parts(
-    db: Session, query: str | None, class_code: str | None, limit: int = 50
-) -> list[Part]:
-    stmt = select(Part).order_by(Part.part_number).limit(limit)
+def _filtered_parts(
+    db: Session,
+    query: str | None,
+    class_code: str | None,
+    part_type: str | None = None,
+    status: str | None = None,
+):
+    stmt = select(Part)
     if query:
         like = f"%{query}%"
         stmt = stmt.where((Part.part_number.ilike(like)) | (Part.name.ilike(like)))
     if class_code:
         stmt = stmt.where(Part.class_id.in_(_class_subtree_ids(db, class_code)))
-    return list(db.execute(stmt).scalars())
+    if part_type:
+        stmt = stmt.where(Part.part_type == part_type)
+    if status:
+        # join the latest revision per part and filter on its status
+        latest = (
+            select(
+                PartRevision.part_id.label("part_id"), func.max(PartRevision.revision).label("rev")
+            )
+            .group_by(PartRevision.part_id)
+            .subquery()
+        )
+        pr = aliased(PartRevision)
+        stmt = (
+            stmt.join(pr, pr.part_id == Part.id)
+            .join(latest, (latest.c.part_id == Part.id) & (latest.c.rev == pr.revision))
+            .where(pr.status == status)
+        )
+    return stmt
+
+
+def count_parts(
+    db: Session,
+    query: str | None,
+    class_code: str | None,
+    part_type: str | None = None,
+    status: str | None = None,
+) -> int:
+    return db.execute(
+        select(func.count()).select_from(
+            _filtered_parts(db, query, class_code, part_type, status).subquery()
+        )
+    ).scalar_one()
+
+
+def search_parts(
+    db: Session,
+    query: str | None,
+    class_code: str | None,
+    part_type: str | None = None,
+    status: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[Part]:
+    stmt = _filtered_parts(db, query, class_code, part_type, status).order_by(Part.part_number)
+    return list(db.execute(stmt.limit(limit).offset(offset)).scalars())
+
+
+def update_revision_attributes(
+    db: Session, *, user: User, rev: PartRevision, attributes: dict, reason: str | None = None
+) -> PartRevision:
+    """Replace the attributes of a draft revision (validated against the class
+    definitions, ADR 0002). Released/non-draft revisions are immutable."""
+    if rev.status != "draft":
+        raise ConflictError(
+            f"attributes of a '{rev.status}' revision are immutable; create a new revision first",
+            code="released_immutable",
+            details={
+                "part_number": rev.part.part_number,
+                "revision": rev.revision,
+                "status": rev.status,
+            },
+        )
+    validate_attributes(db, rev.part.class_id, attributes)
+    old = dict(rev.attributes or {})
+    rev.attributes = attributes
+    audit_service.log_change(
+        db,
+        entity_type="part_revision",
+        entity_id=rev.id,
+        action="update_attributes",
+        user_id=user.id,
+        old_values=old,
+        new_values=attributes,
+        reason=reason,
+    )
+    db.commit()
+    db.refresh(rev)
+    return rev
 
 
 def get_part_with_revisions(db: Session, part_number: str) -> Part:

@@ -192,10 +192,16 @@ def _execute(db: Session, user: User, conf: Confirmation) -> dict:
     if conf.action == "create_report":
         from app.services import report_service
 
-        row = report_service.create_report(
-            db, user=user, part_number=payload.part_number, reason=payload.reason
+        row = report_service.create_report_for(
+            db, user=user, template=payload.template, payload=payload
         )
-        return {"report_id": row.report_id}
+        return {"report_id": row.report_id, "template": row.template}
+    if conf.action == "update_revision_attributes":
+        rev = get_revision_or_404(db, payload.revision_id)
+        rev = part_service.update_revision_attributes(
+            db, user=user, rev=rev, attributes=payload.attributes, reason=payload.reason
+        )
+        return {"part_number": rev.part.part_number, "revision": rev.revision}
     raise ValidationError(f"unknown confirmation action '{conf.action}'", code="unknown_action")
 
 

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.deps import DbSession
+from app.core.deps import CurrentUser, DbSession
 from app.core.errors import ConflictError, NotFoundError
 from app.guardrails.permissions import require_admin
 from app.models.audit import AuditLog
@@ -31,12 +31,21 @@ def health(db: DbSession):
     return HealthResponse(status="ok" if db_ok == "ok" else "degraded", database=db_ok)
 
 
-@router.get("/number-ranges", response_model=list[NumberRangeResponse], dependencies=[Depends(require_admin)])
+@router.get(
+    "/number-ranges",
+    response_model=list[NumberRangeResponse],
+    dependencies=[Depends(require_admin)],
+)
 def list_number_ranges(db: DbSession):
     return list(db.execute(select(NumberRange).order_by(NumberRange.code)).scalars())
 
 
-@router.post("/number-ranges", response_model=NumberRangeResponse, status_code=201, dependencies=[Depends(require_admin)])
+@router.post(
+    "/number-ranges",
+    response_model=NumberRangeResponse,
+    status_code=201,
+    dependencies=[Depends(require_admin)],
+)
 def create_number_range(body: NumberRangeCreate, db: DbSession):
     if db.execute(select(NumberRange).where(NumberRange.code == body.code)).scalar_one_or_none():
         raise ConflictError(f"number range '{body.code}' already exists", code="range_exists")
@@ -49,10 +58,33 @@ def create_number_range(body: NumberRangeCreate, db: DbSession):
 
 @router.get("/part-classes", response_model=list[PartClassResponse])
 def list_part_classes(db: DbSession):
-    return list(db.execute(select(PartClass).order_by(PartClass.code)).scalars())
+    from app.models.numbering import ClassAttribute
+    from app.schemas.admin import ClassAttributeResponse
+
+    classes = list(db.execute(select(PartClass).order_by(PartClass.code)).scalars())
+    defs = db.execute(select(ClassAttribute)).scalars().all()
+    by_class: dict = {}
+    for d in defs:
+        by_class.setdefault(d.class_id, []).append(ClassAttributeResponse.model_validate(d))
+    return [
+        PartClassResponse(
+            id=c.id,
+            code=c.code,
+            name=c.name,
+            default_attributes=c.default_attributes,
+            parent_id=c.parent_id,
+            attributes=by_class.get(c.id, []),
+        )
+        for c in classes
+    ]
 
 
-@router.post("/part-classes", response_model=PartClassResponse, status_code=201, dependencies=[Depends(require_admin)])
+@router.post(
+    "/part-classes",
+    response_model=PartClassResponse,
+    status_code=201,
+    dependencies=[Depends(require_admin)],
+)
 def create_part_class(body: PartClassCreate, db: DbSession):
     if db.execute(select(PartClass).where(PartClass.code == body.code)).scalar_one_or_none():
         raise ConflictError(f"part class '{body.code}' already exists", code="class_exists")
@@ -100,7 +132,7 @@ def audit_log(db: DbSession, limit: int = 100):
 
 
 @router.get("/stats")
-def stats(db: DbSession):
+def stats(db: DbSession, user: CurrentUser):
     return {
         "users": db.execute(select(func.count(User.id))).scalar_one(),
         "parts": db.execute(select(func.count(Part.id))).scalar_one(),

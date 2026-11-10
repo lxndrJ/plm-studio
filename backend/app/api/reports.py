@@ -42,21 +42,78 @@ def create_part_report(
     direct: Annotated[bool, Query()] = False,
 ):
     if not direct:
-        conf = conf_guard.propose(
+        return _propose_report(
             db,
-            user=user,
-            action="create_report",
-            payload={"part_number": part_number, "reason": body.reason},
+            user,
+            action_payload={
+                "template": report_service.TEMPLATE_PART_SHEET,
+                "part_number": part_number,
+                "reason": body.reason,
+            },
             summary=f"create PDF report (part_sheet_v1) for part '{part_number}' (released content only)",
-        )
-        return JSONResponse(
-            status_code=202,
-            content=ConfirmationProposed(confirmation_id=conf.id, summary=conf.summary).model_dump(
-                mode="json"
-            ),
         )
     return _detail(
         report_service.create_report(db, user=user, part_number=part_number, reason=body.reason)
+    )
+
+
+def _propose_report(db, user, *, action_payload: dict, summary: str):
+    conf = conf_guard.propose(
+        db, user=user, action="create_report", payload=action_payload, summary=summary
+    )
+    return JSONResponse(
+        status_code=202,
+        content=ConfirmationProposed(confirmation_id=conf.id, summary=conf.summary).model_dump(
+            mode="json"
+        ),
+    )
+
+
+@router.post("/parts/{part_number}/bom", status_code=201, response_model=ReportDetail)
+def create_bom_report(
+    part_number: str,
+    body: ReportCreate,
+    db: DbSession,
+    user: Annotated[User, Depends(require_editor)],
+    direct: Annotated[bool, Query()] = False,
+):
+    if not direct:
+        return _propose_report(
+            db,
+            user,
+            action_payload={
+                "template": report_service.TEMPLATE_BOM_EXPLOSION,
+                "part_number": part_number,
+                "reason": body.reason,
+            },
+            summary=f"create BOM explosion report for '{part_number}' (released content only)",
+        )
+    return _detail(
+        report_service.create_bom_report(db, user=user, part_number=part_number, reason=body.reason)
+    )
+
+
+@router.post("/ecrs/{ecr_number}", status_code=201, response_model=ReportDetail)
+def create_ecr_report(
+    ecr_number: str,
+    body: ReportCreate,
+    db: DbSession,
+    user: Annotated[User, Depends(require_editor)],
+    direct: Annotated[bool, Query()] = False,
+):
+    if not direct:
+        return _propose_report(
+            db,
+            user,
+            action_payload={
+                "template": report_service.TEMPLATE_ECR,
+                "ecr_number": ecr_number,
+                "reason": body.reason,
+            },
+            summary=f"create ECR/ECO report for '{ecr_number}'",
+        )
+    return _detail(
+        report_service.create_ecr_report(db, user=user, ecr_number=ecr_number, reason=body.reason)
     )
 
 
