@@ -160,6 +160,17 @@ export interface PartsPage {
   page: number;
   pageSize: number;
 }
+export interface LogLine {
+  ts: string;
+  level: string;
+  logger: string;
+  message: string;
+}
+export interface ServiceLogs {
+  service: string;
+  level: string;
+  logs: LogLine[];
+}
 export interface BomItem {
   id: string;
   position: number;
@@ -292,6 +303,8 @@ export const api = {
   stats: () => req<{ users: number; parts: number; open_confirmations: number }>("GET", "/admin/stats"),
   partClasses: () => req<PartClass[]>("GET", "/admin/part-classes"),
   auditLog: (limit = 30) => req<AuditEntry[]>("GET", "/admin/audit-log", { params: { limit: String(limit) } }),
+  adminLogs: (lines = 200, level = "INFO") =>
+    req<ServiceLogs>("GET", "/admin/logs", { params: { lines: String(lines), level } }),
   listUsers: () => req<User[]>("GET", "/auth/users"),
   updateUser: (id: string, patch: { role?: string; is_active?: boolean }) =>
     req<User>("PATCH", `/auth/users/${id}`, { body: patch }),
@@ -333,6 +346,15 @@ const AGENT_BASE = "/agent-api";
 export const agentApi = {
   conversations: () => reqRaw<Conversation[]>(AGENT_BASE, "GET", "/conversations").then((r) => r.data),
   conversation: (id: string) => reqRaw<ConversationDetail>(AGENT_BASE, "GET", `/conversations/${encodeURIComponent(id)}`).then((r) => r.data),
+  logs: (lines = 200, level = "INFO") =>
+    reqRaw<ServiceLogs>(AGENT_BASE, "GET", "/logs", { params: { lines: String(lines), level } }).then((r) => r.data),
+};
+
+const PREVIEWS_BASE = "/previews-api";
+
+export const previewsApi = {
+  logs: (lines = 200, level = "INFO") =>
+    reqRaw<ServiceLogs>(PREVIEWS_BASE, "GET", "/logs", { params: { lines: String(lines), level } }).then((r) => r.data),
 };
 
 export type ChatEvent = { type: string; [k: string]: any };

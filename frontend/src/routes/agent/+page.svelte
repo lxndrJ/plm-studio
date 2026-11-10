@@ -8,6 +8,7 @@
     tool?: string;
     proposalId?: string;
     proposalSummary?: string;
+    error?: string;
   }
 
   let conversations: Conversation[] = [];
@@ -16,6 +17,8 @@
   let input = "";
   let sending = false;
   let error = "";
+  let eventLog: string[] = [];
+  let showEvents = false;
 
   async function loadConversations(): Promise<void> {
     try {
@@ -52,11 +55,15 @@
     messages = [...messages, { role: "user", text }];
     const assistantMsg: Msg = { role: "assistant", text: "" };
     messages = [...messages, assistantMsg];
+    eventLog = [];
     try {
       await chatStream(text, activeId, (ev: ChatEvent) => {
+        eventLog = [...eventLog, JSON.stringify(ev)];
         if (ev.type === "conversation") {
           activeId = ev.conversation_id;
           loadConversations();
+        } else if (ev.type === "error") {
+          messages = [...messages, { role: "assistant", error: ev.message }];
         } else if (ev.type === "tool_call") {
           const res = ev.result ?? {};
           if (res.proposed) {
@@ -74,6 +81,7 @@
       });
     } catch (e: any) {
       error = e?.message ?? "Chat fehlgeschlagen";
+      messages = [...messages, { role: "assistant", error: `Chat fehlgeschlagen: ${error}` }];
     } finally {
       sending = false;
     }
@@ -113,7 +121,9 @@
     <div class="chat-log">
       {#if messages.length === 0}<div class="empty">Stelle eine Frage, z. B. „Suche alle TEST-Teile und lege ‚Neues Teil‘ als Änderungsvorschlag an“.</div>{/if}
       {#each messages as m}
-        {#if m.role === "tool"}
+        {#if m.error}
+          <div class="msg error">⚠ {m.error}</div>
+        {:else if m.role === "tool"}
           <div class="msg tool">
             🔧 {m.tool ?? ""}
             {#if m.proposalId}
@@ -127,8 +137,14 @@
           <div class="msg {m.role}">{m.text}</div>
         {/if}
       {/each}
-      {#if sending}<div class="msg tool">…</div>{/if}
+      {#if sending}<div class="msg tool">Agent arbeitet …</div>{/if}
     </div>
+    {#if eventLog.length > 0}
+      <details style="margin-top: 10px">
+        <summary class="small muted" on:click={() => (showEvents = !showEvents)}>SSE-Event-Log ({eventLog.length})</summary>
+        <pre class="json" style="max-height: 200px">{eventLog.join("\n")}</pre>
+      </details>
+    {/if}
     <div class="chat-input">
       <input class="input" style="flex: 1" placeholder="Nachricht an den Agenten …" bind:value={input} on:keydown={(e) => e.key === "Enter" && send()} disabled={sending} />
       <button class="btn btn-primary" on:click={send} disabled={sending || !input.trim()}>Senden</button>

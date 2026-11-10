@@ -41,6 +41,10 @@ project document "PLM-System Blueprint". Rules for agents:
       document preview pane, list pagination + type/status filters + CSV/JSON export
       (`/export/parts`, `/export/bom/{pn}`), BOM-explosion + ECR/ECO PDF report templates,
       confirmations badge in nav, `/admin/stats` now requires auth
+- [x] Logs in der UI: `/logs`-Seite aggregiert die In-Memory-Ringbuffer aller Dienste
+      (`GET /api/v1/admin/logs` [admin], `GET /agent-api/logs`, `GET /previews-api/logs` —
+      Previews-Worker serviert dafür einen Mini-HTTP-Port 8002); `/agent`-Chat zeigt SSE-Error-Events
+      als rote Bubbles + aufklappbares Event-Log
 - [ ] Phase 3 (M12+): planned in [docs/phase-3.md](docs/phase-3.md)
 
 ## Quickstart

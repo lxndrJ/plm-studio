@@ -25,6 +25,7 @@ from app.core import security
 from app.core.config import get_settings
 from app.core.db import SessionLocal, engine
 from app.core.errors import register_error_handlers
+from app.core.logging import install_logging
 from app.models.user import User
 from app.services.seed import seed_all
 
@@ -123,6 +124,7 @@ app = FastAPI(
 )
 
 register_error_handlers(app)
+install_logging()
 
 API = "/api/v1"
 app.include_router(auth.router, prefix=API)

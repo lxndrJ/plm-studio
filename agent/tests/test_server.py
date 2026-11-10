@@ -233,3 +233,31 @@ def test_chat_stream_yields_error_event_when_llm_fails():
     assert "error" in types
     assert types[-1] == "end"
     assert "HTTPStatusError" in next(e for e in events if e["type"] == "error")["message"]
+
+
+def test_logs_endpoint_returns_ring_buffer():
+    import logging
+
+    from plm_agent.server import create_app as _create_app
+
+    logging.getLogger("plm_agent.test").warning("agent-log-marker-xyz")
+    state = {"requests": []}
+    agent = _make_agent(state, httpx.MockTransport(_handler(state)))
+    client = TestClient(_create_app(agent=agent))
+    r = client.get("/logs?lines=50")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["service"] == "agent"
+    assert any("agent-log-marker-xyz" in line["message"] for line in body["logs"])
+
+
+def test_logs_endpoint_enforces_service_token(monkeypatch):
+    import logging
+
+    monkeypatch.setenv("AGENT_SERVICE_TOKEN", "sekret")
+    logging.getLogger("plm_agent.test").warning("marker2")
+    state = {"requests": []}
+    agent = _make_agent(state, httpx.MockTransport(_handler(state)))
+    client = TestClient(create_app(agent=agent))
+    assert client.get("/logs").status_code == 401
+    assert client.get("/logs", headers={"X-Agent-Token": "sekret"}).status_code == 200
