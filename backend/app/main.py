@@ -5,6 +5,7 @@ from pathlib import Path
 from alembic.config import Config
 from fastapi import FastAPI
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from alembic import command
 from app.api import (
@@ -68,6 +69,27 @@ def ensure_schema(engine, database_url: str) -> None:
             os.environ["DATABASE_URL"] = old
 
 
+def bootstrap_agent_user(db: Session, settings) -> User | None:
+    """Create the agent service account (role editor — never approver, so the
+    agent cannot approve its own confirmations) when PLM_AGENT_EMAIL/PASSWORD
+    are configured and the user does not exist yet. Idempotent."""
+    if not settings.PLM_AGENT_EMAIL or not settings.PLM_AGENT_PASSWORD:
+        return None
+    existing = db.execute(
+        select(User).where(User.email == settings.PLM_AGENT_EMAIL)
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+    agent_user = User(
+        email=bootstrap_admin_email(settings.PLM_AGENT_EMAIL),
+        password_hash=security.hash_password(settings.PLM_AGENT_PASSWORD),
+        role="editor",
+    )
+    db.add(agent_user)
+    db.commit()
+    return agent_user
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
@@ -83,6 +105,7 @@ async def lifespan(app: FastAPI):
             )
             db.add(admin_user)
             db.commit()
+        bootstrap_agent_user(db, settings)
     finally:
         db.close()
     yield

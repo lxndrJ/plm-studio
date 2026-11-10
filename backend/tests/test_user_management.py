@@ -5,6 +5,7 @@ import uuid
 import pytest
 import sqlalchemy as sa
 
+from app.core import security
 from app.guardrails import rate_limit
 from app.models.audit import AuditLog
 from app.models.user import User
@@ -275,3 +276,33 @@ def test_rate_limit_is_scoped_per_email(client):
         "/api/v1/auth/login", json={"email": "editor@example.com", "password": "editor-pw"}
     )
     assert r.status_code == 200
+
+
+# --- M10: agent service account bootstrap --------------------------------------
+
+
+def test_bootstrap_agent_user_creates_editor_when_configured(db):
+    from app.core.config import Settings
+    from app.main import bootstrap_agent_user
+
+    s = Settings(PLM_AGENT_EMAIL="agent@example.com", PLM_AGENT_PASSWORD="agent-pw-1")
+    u = bootstrap_agent_user(db, s)
+    assert u is not None
+    assert u.role == "editor"  # never approver: the agent must not self-approve
+    assert u.is_active is True
+    # idempotent
+    again = bootstrap_agent_user(db, s)
+    assert again.id == u.id
+    count = db.execute(
+        sa.select(sa.func.count(User.id)).where(User.email == "agent@example.com")
+    ).scalar_one()
+    assert count == 1
+    # login works with the configured password
+    assert security.verify_password("agent-pw-1", u.password_hash)
+
+
+def test_bootstrap_agent_user_noop_without_env(db):
+    from app.core.config import Settings
+    from app.main import bootstrap_agent_user
+
+    assert bootstrap_agent_user(db, Settings(PLM_AGENT_EMAIL="", PLM_AGENT_PASSWORD="")) is None
