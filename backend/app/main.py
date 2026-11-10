@@ -16,6 +16,7 @@ from app.api import (
     changes,
     confirmations,
     documents,
+    export,
     parts,
     reports,
     revisions,
@@ -134,6 +135,7 @@ app.include_router(reports.router, prefix=API)
 app.include_router(confirmations.router, prefix=API)
 app.include_router(admin.router, prefix=API)
 app.include_router(agent.router, prefix=API)
+app.include_router(export.router, prefix=API)
 
 
 @app.get("/health")

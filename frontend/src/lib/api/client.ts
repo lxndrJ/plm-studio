@@ -15,12 +15,13 @@ export class ApiError extends Error {
 
 const BASE = "/api/v1";
 
-async function req<T>(
+async function reqRaw<T>(
+  base: string,
   method: string,
   path: string,
   opts: { body?: unknown; params?: Record<string, string | undefined>; form?: FormData; raw?: boolean } = {},
-): Promise<T> {
-  const url = new URL(BASE + path, window.location.origin);
+): Promise<{ data: T; headers: Headers }> {
+  const url = new URL(base + path, window.location.origin);
   if (opts.params) {
     for (const [k, v] of Object.entries(opts.params)) if (v !== undefined && v !== "") url.searchParams.set(k, v);
   }
@@ -44,10 +45,18 @@ async function req<T>(
     }
     throw new ApiError(res.status, detail);
   }
-  if (res.status === 204) return undefined as T;
+  if (res.status === 204) return { data: undefined as T, headers: res.headers };
   const ct = res.headers.get("content-type") ?? "";
-  if (opts.raw) return (await res.blob()) as T;
-  return (ct.includes("json") ? res.json() : res.text()) as Promise<T>;
+  const data = (opts.raw ? await res.blob() : ct.includes("json") ? await res.json() : await res.text()) as T;
+  return { data, headers: res.headers };
+}
+
+async function req<T>(
+  method: string,
+  path: string,
+  opts: { body?: unknown; params?: Record<string, string | undefined>; form?: FormData; raw?: boolean } = {},
+): Promise<T> {
+  return (await reqRaw<T>(BASE, method, path, opts)).data;
 }
 
 export async function download(path: string, filename: string): Promise<void> {
@@ -60,6 +69,14 @@ export async function download(path: string, filename: string): Promise<void> {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/** Authenticated blob as object URL (for inline previews, e.g. document files). */
+export async function fetchBlobUrl(path: string): Promise<string> {
+  const token = get(auth).token;
+  const res = await fetch(BASE + path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})));
+  return URL.createObjectURL(await res.blob());
 }
 
 export interface TokenResponse {
@@ -91,10 +108,57 @@ export interface Part {
   created_at: string;
   revisions: Revision[];
 }
+export interface ClassAttribute {
+  key: string;
+  label: string;
+  attr_type: "string" | "number" | "boolean" | "enum";
+  unit_code: string | null;
+  required: boolean;
+  allowed_values: string[] | null;
+}
 export interface PartClass {
   id: string;
   code: string;
   name: string;
+  attributes?: ClassAttribute[];
+}
+export interface User {
+  id: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+}
+export interface AuditEntry {
+  id: number;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
+  reason: string | null;
+  user_id: string;
+  at: string | null;
+}
+export interface Conversation {
+  id: string;
+  title: string;
+  created_by: string;
+  created_at: string;
+}
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant" | "tool" | "system";
+  content: Record<string, any>;
+  created_at: string;
+}
+export interface ConversationDetail extends Conversation {
+  messages: ChatMessage[];
+}
+export interface PartsPage {
+  items: PartSummary[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 export interface BomItem {
   id: string;
@@ -227,5 +291,79 @@ export const api = {
   },
   stats: () => req<{ users: number; parts: number; open_confirmations: number }>("GET", "/admin/stats"),
   partClasses: () => req<PartClass[]>("GET", "/admin/part-classes"),
-  auditLog: (limit = 30) => req<any[]>("GET", "/admin/audit-log", { params: { limit: String(limit) } }),
+  auditLog: (limit = 30) => req<AuditEntry[]>("GET", "/admin/audit-log", { params: { limit: String(limit) } }),
+  listUsers: () => req<User[]>("GET", "/auth/users"),
+  updateUser: (id: string, patch: { role?: string; is_active?: boolean }) =>
+    req<User>("PATCH", `/auth/users/${id}`, { body: patch }),
+  resetUserPassword: (id: string, newPassword: string) =>
+    req<{ status: string }>("POST", `/auth/users/${id}/reset-password`, { body: { new_password: newPassword } }),
+  changePassword: (oldPassword: string, newPassword: string) =>
+    req<{ status: string }>("POST", "/auth/change-password", { body: { old_password: oldPassword, new_password: newPassword } }),
+  logout: () => req<{ status: string }>("POST", "/auth/logout"),
+  listPartsPage: async (opts: { query?: string; classCode?: string; partType?: string; status?: string; page?: number; pageSize?: number }) => {
+    const r = await reqRaw<PartSummary[]>(BASE, "GET", "/parts", {
+      params: {
+        query: opts.query,
+        class_code: opts.classCode,
+        part_type: opts.partType,
+        status: opts.status,
+        page: String(opts.page ?? 1),
+        page_size: String(opts.pageSize ?? 25),
+      },
+    });
+    return {
+      items: r.data,
+      total: Number(r.headers.get("x-total-count") ?? r.data.length),
+      page: Number(r.headers.get("x-page") ?? 1),
+      pageSize: Number(r.headers.get("x-page-size") ?? 25),
+    } satisfies PartsPage;
+  },
+  updateAttributes: (pn: string, revisionId: string, attributes: Record<string, unknown>, reason?: string) =>
+    req<Revision>("PATCH", `/parts/${encodeURIComponent(pn)}/revisions/${revisionId}/attributes?direct=true`, {
+      body: { attributes, reason },
+    }),
+  createBomReport: (pn: string, reason?: string) =>
+    req<Report>("POST", `/reports/parts/${encodeURIComponent(pn)}/bom?direct=true`, { body: { reason } }),
+  createEcrReport: (nr: string, reason?: string) =>
+    req<Report>("POST", `/reports/ecrs/${encodeURIComponent(nr)}?direct=true`, { body: { reason } }),
 };
+
+const AGENT_BASE = "/agent-api";
+
+export const agentApi = {
+  conversations: () => reqRaw<Conversation[]>(AGENT_BASE, "GET", "/conversations").then((r) => r.data),
+  conversation: (id: string) => reqRaw<ConversationDetail>(AGENT_BASE, "GET", `/conversations/${encodeURIComponent(id)}`).then((r) => r.data),
+};
+
+export type ChatEvent = { type: string; [k: string]: any };
+
+export async function chatStream(
+  message: string,
+  conversationId: string | null,
+  onEvent: (e: ChatEvent) => void,
+): Promise<void> {
+  const token = get(auth).token;
+  const res = await fetch("/agent-api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ message, conversation_id: conversationId }),
+    credentials: "include",
+  });
+  if (!res.ok || !res.body) throw new ApiError(res.status, await res.json().catch(() => ({})));
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let idx: number;
+    while ((idx = buf.indexOf("\n\n")) >= 0) {
+      const chunk = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      for (const line of chunk.split("\n")) {
+        if (line.startsWith("data: ")) onEvent(JSON.parse(line.slice(6)));
+      }
+    }
+  }
+}

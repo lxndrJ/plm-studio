@@ -4,6 +4,7 @@
 
   let reports: Report[] = [];
   let pn = "";
+  let ecrNr = "";
   let reason = "";
   let error = "";
   let notice = "";
@@ -30,6 +31,30 @@
       await load();
     } catch (e: any) {
       error = e?.code === "no_released_revision" ? "Teil hat keine freigegebene (released) Revision — Reports enthalten nur released Content." : e?.message;
+    }
+  }
+
+  async function createBom(): Promise<void> {
+    error = "";
+    notice = "";
+    try {
+      const r = await api.createBomReport(pn.trim(), reason || undefined);
+      notice = `${r.report_id} (bom_explosion_v1) erstellt.`;
+      await load();
+    } catch (e: any) {
+      error = e?.code === "no_released_revision" ? "Teil hat keine released Revision." : e?.message;
+    }
+  }
+
+  async function createEcr(): Promise<void> {
+    error = "";
+    notice = "";
+    try {
+      const r = await api.createEcrReport(ecrNr.trim(), reason || undefined);
+      notice = `${r.report_id} (ecr_v1) erstellt.`;
+      await load();
+    } catch (e: any) {
+      error = e?.message;
     }
   }
 
@@ -75,10 +100,15 @@
 
 <div class="card" style="margin-bottom: 14px">
   <h3>Report erstellen</h3>
-  <div class="toolbar">
+  <div class="toolbar" style="margin-bottom: 8px">
     <input class="input" style="max-width: 240px" placeholder="Sachnummer mit released Revision" bind:value={pn} />
     <input class="input" style="max-width: 220px" placeholder="Grund (optional)" bind:value={reason} />
-    <button class="btn btn-primary" disabled={!pn} on:click={create}>PDF-Report erzeugen</button>
+    <button class="btn btn-primary" disabled={!pn} on:click={create}>PDF-Teileblatt</button>
+    <button class="btn btn-ghost" disabled={!pn} on:click={createBom}>Stückliste (mehrstufig)</button>
+  </div>
+  <div class="toolbar">
+    <input class="input" style="max-width: 240px" placeholder="ECR-Nummer, z. B. ECR-00001" bind:value={ecrNr} />
+    <button class="btn btn-ghost" disabled={!ecrNr} on:click={createEcr}>ECR/ECO-Bericht</button>
   </div>
 </div>
 

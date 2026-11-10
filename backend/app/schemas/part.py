@@ -17,6 +17,11 @@ class PartRevisionCreate(BaseModel):
     change_reason: str = Field(min_length=1)
 
 
+class AttributesUpdate(BaseModel):
+    attributes: dict = Field(default_factory=dict)
+    reason: str | None = None
+
+
 class TransitionRequest(BaseModel):
     to_status: str = Field(pattern="^(draft|review|released|obsolete)$")
     reason: str = Field(min_length=1)

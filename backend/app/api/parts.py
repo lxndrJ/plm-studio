@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
@@ -22,10 +22,29 @@ router = APIRouter(prefix="/parts", tags=["parts"])
 def list_parts(
     db: DbSession,
     user: CurrentUser,
+    response: Response,
     query: Annotated[str | None, Query()] = None,
     class_code: Annotated[str | None, Query()] = None,
+    part_type: Annotated[str | None, Query()] = None,
+    status: Annotated[str | None, Query()] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=200)] = 50,
 ):
-    return part_service.search_parts(db, query=query, class_code=class_code)
+    total = part_service.count_parts(
+        db, query=query, class_code=class_code, part_type=part_type, status=status
+    )
+    response.headers["X-Total-Count"] = str(total)
+    response.headers["X-Page"] = str(page)
+    response.headers["X-Page-Size"] = str(page_size)
+    return part_service.search_parts(
+        db,
+        query=query,
+        class_code=class_code,
+        part_type=part_type,
+        status=status,
+        limit=page_size,
+        offset=(page - 1) * page_size,
+    )
 
 
 @router.post("", status_code=201)
@@ -33,14 +52,28 @@ def create_part(
     body: PartCreate,
     db: DbSession,
     user: Annotated[User, Depends(require_editor)],
-    direct: Annotated[bool, Query(description="true = commit immediately (UI path); false = propose confirmation token (agent path)")] = False,
+    direct: Annotated[
+        bool,
+        Query(
+            description="true = commit immediately (UI path); false = propose confirmation token (agent path)"
+        ),
+    ] = False,
 ):
     payload = body.model_dump()
     summary = f"create part '{body.name}' (type={body.part_type}, class={body.class_code})"
     if not direct:
-        conf = conf_guard.propose(db, user=user, action="create_part", payload=payload, summary=summary)
-        return JSONResponse(status_code=202, content=ConfirmationProposed(confirmation_id=conf.id, summary=summary).model_dump(mode="json"))
-    class_id = db.execute(select(PartClass.id).where(PartClass.code == body.class_code)).scalar_one_or_none()
+        conf = conf_guard.propose(
+            db, user=user, action="create_part", payload=payload, summary=summary
+        )
+        return JSONResponse(
+            status_code=202,
+            content=ConfirmationProposed(confirmation_id=conf.id, summary=summary).model_dump(
+                mode="json"
+            ),
+        )
+    class_id = db.execute(
+        select(PartClass.id).where(PartClass.code == body.class_code)
+    ).scalar_one_or_none()
     if class_id is None:
         raise NotFoundError(f"part class '{body.class_code}' not found", code="class_not_found")
     part = part_service.create_part(
@@ -63,7 +96,9 @@ def get_part(part_number: str, db: DbSession, user: CurrentUser):
 
 
 @router.put("/{part_number}/revisions/{revision_id}", status_code=409)
-def update_revision_blocked(part_number: str, revision_id: uuid.UUID, user: Annotated[User, Depends(require_editor)]):
+def update_revision_blocked(
+    part_number: str, revision_id: uuid.UUID, user: Annotated[User, Depends(require_editor)]
+):
     from app.core.errors import ConflictError
 
     raise ConflictError(

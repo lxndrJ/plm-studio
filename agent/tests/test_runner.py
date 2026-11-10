@@ -3,7 +3,7 @@ import json
 import httpx
 
 from plm_agent.runner import PlmAgent
-from plm_agent.toolgen import generate
+from plm_agent.toolgen import ToolCatalog, generate
 
 OPENAPI = {
     "openapi": "3.1.0",
@@ -233,3 +233,48 @@ def test_409_is_passed_through_to_llm():
     llm_bodies = [json.loads(r[3]) for r in state["requests"] if r[1].endswith("/chat/completions")]
     tool_msgs = [m for b in llm_bodies for m in b["messages"] if m["role"] == "tool"]
     assert any("duplicate_part" in m["content"] and "P-000001" in m["content"] for m in tool_msgs)
+
+
+def test_llm_url_normalization_supports_direct_provider():
+    """OPENAI_BASE_URL may be a LiteLLM proxy or a direct provider (e.g. Mistral);
+    the runner must normalize to <base>/v1/chat/completions exactly once."""
+
+    def make(llm_base: str) -> PlmAgent:
+        return PlmAgent(
+            plm_base_url="http://plm.test",
+            llm_base_url=llm_base,
+            api_key="key",
+            model="mistral-large-latest",
+            email="a@b.c",
+            password="pw",
+            catalog=ToolCatalog([], {}),
+            system_prompt="s",
+        )
+
+    assert make("https://api.mistral.ai/v1").llm_url == "https://api.mistral.ai/v1/chat/completions"
+    assert make("https://api.mistral.ai").llm_url == "https://api.mistral.ai/v1/chat/completions"
+    assert make("http://localhost:4000/v1").llm_url == "http://localhost:4000/v1/chat/completions"
+
+
+def test_llm_request_uses_bearer_api_key_and_chat_completions():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["auth"] = request.headers.get("authorization")
+        return httpx.Response(200, json=_llm_response(content="ok"))
+
+    agent = PlmAgent(
+        plm_base_url="http://plm.test",
+        llm_base_url="https://api.mistral.ai/v1",
+        api_key="mstrl-test-only",
+        model="mistral-large-latest",
+        email="a@b.c",
+        password="pw",
+        catalog=ToolCatalog([], {}),
+        system_prompt="s",
+        transport=httpx.MockTransport(handler),
+    )
+    agent._llm([{"role": "user", "content": "hi"}])
+    assert captured["url"] == "https://api.mistral.ai/v1/chat/completions"
+    assert captured["auth"] == "Bearer mstrl-test-only"

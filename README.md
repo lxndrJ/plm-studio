@@ -35,6 +35,13 @@ project document "PLM-System Blueprint". Rules for agents:
       `POST /chat` (SSE stream: tool calls, 202 proposals, answer) and conversation persistence
       via `POST/GET /api/v1/agent/conversations*` (migration 0005, owner-scoped); CLI is a thin
       client with `--service-url`; `/api/v1/agent/*` is excluded from the LLM tool catalog
+- [x] M11 Phase-2 UI/reports/export: `/agent` chat page (SSE stream, inline proposal approval),
+      `/admin` page (users/roles/active, password reset, classes with typed attribute defs, audit
+      log, stats), typed attribute form on part detail (`PATCH .../attributes`, draft-only),
+      document preview pane, list pagination + type/status filters + CSV/JSON export
+      (`/export/parts`, `/export/bom/{pn}`), BOM-explosion + ECR/ECO PDF report templates,
+      confirmations badge in nav, `/admin/stats` now requires auth
+- [ ] Phase 3 (M12+): planned in [docs/phase-3.md](docs/phase-3.md)
 
 ## Quickstart
 
@@ -113,6 +120,12 @@ always come back as 202 + confirmation token and are approved by the human via
 Conversations persist in the backend (`/api/v1/agent/conversations*`, migration 0005,
 owned by the agent service account). If `AGENT_SERVICE_TOKEN` is set, clients must send
 it as `X-Agent-Token`. The service is internal — do not expose it publicly.
+
+LLM endpoint: default is the local LiteLLM proxy (`OPENAI_BASE_URL=http://litellm:4000/v1`,
+`LLM_MODEL=plm-chat`). A direct provider also works — e.g. Mistral:
+`OPENAI_BASE_URL=https://api.mistral.ai/v1`, `OPENAI_API_KEY=<key>`,
+`LLM_MODEL=mistral-large-latest` (real keys only in the local `.env`, never committed;
+see `.env.example`). The runner normalizes the base URL to `.../v1/chat/completions`.
 
 ## Updates & dependencies
 
