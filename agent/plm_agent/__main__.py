@@ -24,7 +24,41 @@ def main() -> int:
     parser.add_argument("--password", default=os.environ.get("PLM_AGENT_PASSWORD", ""))
     parser.add_argument("--tools", default=str(AGENT_ROOT / "tools" / "tools.json"))
     parser.add_argument("--system-prompt", default=str(AGENT_ROOT / "prompts" / "system-prompt.md"))
+    parser.add_argument(
+        "--service-url",
+        default=os.environ.get("AGENT_SERVICE_URL"),
+        help="If set, the prompt is sent to the agent service (M10) instead of running locally",
+    )
     args = parser.parse_args()
+
+    if args.service_url:
+        # thin client: stream the SSE chat from the agent service and print it
+        import httpx
+
+        with (
+            httpx.Client(timeout=300.0) as http,
+            http.stream(
+                "POST",
+                args.service_url.rstrip("/") + "/chat",
+                json={"message": args.prompt},
+            ) as r,
+        ):
+            r.raise_for_status()
+            for line in r.iter_lines():
+                if not line.startswith("data: "):
+                    continue
+                event = json.loads(line[6:])
+                if event["type"] == "delta":
+                    print(event["content"])
+                elif event["type"] == "tool_call":
+                    result = event.get("result") or {}
+                    if result.get("proposed"):
+                        print(
+                            f"[Vorschlag {result.get('confirmation_id')}] {result.get('summary')}"
+                        )
+                    else:
+                        print(f"[tool {event['name']}] -> HTTP {result.get('status')}")
+        return 0
 
     catalog = ToolCatalog.from_dict(json.loads(Path(args.tools).read_text(encoding="utf-8")))
     agent = PlmAgent(

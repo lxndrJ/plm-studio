@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 API_PREFIX = "/api/v1"
-EXCLUDED_PREFIXES = ("/api/v1/auth", "/api/v1/admin")
+EXCLUDED_PREFIXES = ("/api/v1/auth", "/api/v1/admin", "/api/v1/agent")
 EXCLUDED_SUFFIXES = ("/approve", "/reject")
 WRITE_METHODS = ("POST", "PUT", "PATCH", "DELETE")
 

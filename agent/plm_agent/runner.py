@@ -117,22 +117,53 @@ class PlmAgent:
             }
         return {"status": r.status_code, "body": payload}
 
-    def run(self, user_prompt: str) -> str:
+    def api_request(self, method: str, path: str, *, params=None, body=None) -> httpx.Response:
+        """Public wrapper around the authenticated PLM request with backoff
+        (used by the agent service for conversation persistence)."""
         if self._token is None:
             self.login()
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
+        return self._plm_request(method, path, params=params, body=body)
+
+    def run_events(self, user_prompt: str, history: list[dict] | None = None):
+        """Streaming variant of run(): yields event dicts.
+
+        Events: {"type": "tool_call", name, arguments, result} per tool call,
+        {"type": "delta", "content"} for the final answer, and finally
+        {"type": "done", "content", "messages"} with the full message list
+        (for persistence). `history` is a list of prior LLM messages."""
+        if self._token is None:
+            self.login()
+        messages = [{"role": "system", "content": self.system_prompt}]
+        if history:
+            messages.extend(history)
+        messages.append({"role": "user", "content": user_prompt})
         for _ in range(self.max_steps):
             message = self._llm(messages)
             messages.append(message)
             calls = message.get("tool_calls") or []
             if not calls:
-                return message.get("content") or ""
+                content = message.get("content") or ""
+                yield {"type": "delta", "content": content}
+                yield {"type": "done", "content": content, "messages": messages}
+                return
             for call in calls:
                 result = self._execute_tool(call)
+                yield {
+                    "type": "tool_call",
+                    "call_id": call["id"],
+                    "name": call["function"]["name"],
+                    "arguments": call["function"].get("arguments"),
+                    "result": result,
+                }
                 messages.append(
                     {"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result)}
                 )
-        return "max_steps reached without a final answer"
+        content = "max_steps reached without a final answer"
+        yield {"type": "delta", "content": content}
+        yield {"type": "done", "content": content, "messages": messages}
+
+    def run(self, user_prompt: str) -> str:
+        for event in self.run_events(user_prompt):
+            if event["type"] == "done":
+                return event["content"]
+        return ""

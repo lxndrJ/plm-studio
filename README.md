@@ -23,17 +23,18 @@ project document "PLM-System Blueprint". Rules for agents:
       released-only content filter (internal attributes like preis/lieferant stripped), PDF download, confirmation-token path
 - [x] M7 AI layer (agent/: tools generated from /openapi.json via `plm_agent.toolgen`,
       ReAct runner via LiteLLM, guardrails: no `direct` writes, never self-approve confirmations, 429/5xx backoff)
-<<<<<<< HEAD
 - [x] M8 Phase-2 security: user management (`GET/PATCH /auth/users`, deactivate, role change with
       self-lockout guard), password change + admin reset (token invalidation via password fingerprint),
       logout revokes access+refresh tokens (jti denylist, migration 0004), login rate limiting
       (429 + Retry-After, migration 0004, configurable via `LOGIN_RATE_LIMIT_*`) — all audited
-=======
 - [x] M9 Phase-2 ECO execution: `approved -> executed` creates one successor draft revision per
       affected (released-only, 409 `affected_not_released`) part revision, inheriting attributes+BOM,
       `change_reason` references ECO/ECR, idempotent via the workflow matrix, fully audited;
       see docs/changes.md
->>>>>>> 785cd70 (feat(backend): M9 ECO execution - 'executed' creates successor revisions)
+- [x] M10 Phase-2 agent service: `agent/` runs as its own compose service (port 8001) with
+      `POST /chat` (SSE stream: tool calls, 202 proposals, answer) and conversation persistence
+      via `POST/GET /api/v1/agent/conversations*` (migration 0005, owner-scoped); CLI is a thin
+      client with `--service-url`; `/api/v1/agent/*` is excluded from the LLM tool catalog
 
 ## Quickstart
 
@@ -100,6 +101,18 @@ Runbooks: docs/runbooks/.
 The agent only calls documented API endpoints (tools from /openapi.json), writes
 always come back as 202 + confirmation token and are approved by the human via
 `POST /api/v1/confirmations/{id}/approve`.
+
+### Agent service (M10)
+
+    docker compose up -d agent        # http://localhost:8001
+    curl -N -X POST http://localhost:8001/chat -H 'Content-Type: application/json' \
+         -d '{"message": "Suche alle TEST-Teile"}'
+    # SSE events: conversation -> tool_call* -> delta -> done -> end
+    # CLI as thin client: AGENT_SERVICE_URL=http://localhost:8001 python -m plm_agent "..."
+
+Conversations persist in the backend (`/api/v1/agent/conversations*`, migration 0005,
+owned by the agent service account). If `AGENT_SERVICE_TOKEN` is set, clients must send
+it as `X-Agent-Token`. The service is internal — do not expose it publicly.
 
 ## Updates & dependencies
 

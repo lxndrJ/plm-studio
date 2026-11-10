@@ -1,3 +1,4 @@
+from app.models.agent import AgentConversation, AgentMessage
 from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.bom import BomItem
@@ -14,6 +15,8 @@ from app.models.user import User
 from app.models.workflow import WorkflowTransition
 
 __all__ = [
+    "AgentConversation",
+    "AgentMessage",
     "AuditLog",
     "Base",
     "BomItem",
