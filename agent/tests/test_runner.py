@@ -330,3 +330,73 @@ def test_llm_error_message_includes_provider_body():
         agent._llm([{"role": "user", "content": "hi"}])
     assert "400" in str(exc.value)
     assert "Invalid model name: foo-bar" in str(exc.value)
+
+
+def test_sanitize_history_drops_orphan_tool_messages():
+    from plm_agent.runner import sanitize_history
+
+    # stored history: user, tool (orphan — its assistant tool_call message was not stored), assistant, user
+    history = [
+        {"role": "user", "content": "frage 1"},
+        {"role": "tool", "tool_call_id": "c1", "content": "{}"},
+        {"role": "assistant", "content": "antwort 1"},
+        {"role": "user", "content": "frage 2"},
+    ]
+    out = sanitize_history(history)
+    assert [m["role"] for m in out] == ["user", "assistant", "user"]
+    assert all(m["role"] != "tool" for m in out)
+
+
+def test_sanitize_history_keeps_valid_tool_sequence_and_strips_dangling_calls():
+    from plm_agent.runner import sanitize_history
+
+    valid = [
+        {"role": "user", "content": "frage"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{"id": "c1", "function": {"name": "get_parts", "arguments": "{}"}}],
+        },
+        {"role": "tool", "tool_call_id": "c1", "content": "{}"},
+        {"role": "assistant", "content": "fertig"},
+    ]
+    out = sanitize_history(valid)
+    assert [m["role"] for m in out] == ["user", "assistant", "tool", "assistant"]
+
+    dangling = [
+        {"role": "user", "content": "frage"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{"id": "c9", "function": {"name": "x", "arguments": "{}"}}],
+        },
+    ]
+    out = sanitize_history(dangling)
+    assert "tool_calls" not in out[-1]
+
+
+def test_llm_normalizes_null_assistant_content():
+    state = {"llm_calls": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).endswith("/api/v1/auth/login"):
+            return httpx.Response(200, json={"access_token": "tok"})
+        if str(request.url).endswith("/chat/completions"):
+            state["llm_calls"] += 1
+            if state["llm_calls"] == 1:
+                return httpx.Response(
+                    200,
+                    json=_llm_response(content=None, tool_calls=[_call("c1", "get_parts", {})]),
+                )
+            body = json.loads(request.content)
+            state["second_body"] = body
+            return httpx.Response(200, json=_llm_response(content="fertig"))
+        return httpx.Response(404, json={})
+
+    agent = _make_agent(state, httpx.MockTransport(handler))
+    result = agent.run("frage")
+    assert result == "fertig"
+    msgs = state["second_body"]["messages"]
+    assistant_with_calls = next(m for m in msgs if m["role"] == "assistant")
+    assert assistant_with_calls["content"] == ""  # null normalized, not sent as null
+    assert assistant_with_calls["tool_calls"][0]["id"] == "c1"

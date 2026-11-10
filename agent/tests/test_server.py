@@ -314,3 +314,51 @@ def test_reload_tools_refetches_catalog_from_api():
     assert r.json()["tools"] == 1
     assert len(agent.catalog.tools) == 1
     assert state["openapi"] == 1
+
+
+def test_chat_continuation_sanitizes_stored_history():
+    """Stored history may contain tool messages whose assistant tool_call message
+    was not persisted — the LLM request must stay valid (no tool-after-user)."""
+    state = {
+        "requests": [],
+        "conversation": {
+            "id": "conv-1",
+            "title": "t",
+            "created_by": "u",
+            "created_at": "2026-11-09T00:00:00",
+            "messages": [
+                {"role": "user", "content": {"text": "erste frage"}},
+                {
+                    "role": "tool",
+                    "content": {"tool_call_id": "c1", "name": "get_parts", "content": "{}"},
+                },  # orphan
+                {"role": "assistant", "content": {"text": "erste antwort"}},
+            ],
+        },
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        state["requests"].append((request.method, url, request.content))
+        if url.endswith("/api/v1/auth/login"):
+            return httpx.Response(200, json={"access_token": "tok"})
+        if url.endswith("/chat/completions"):
+            return httpx.Response(200, json=_llm_response(content="zweite antwort"))
+        if url.endswith("/api/v1/parts") and request.method == "GET":
+            return httpx.Response(200, json=[])
+        if "/api/v1/agent/conversations" in url:
+            if request.method == "GET":
+                return httpx.Response(200, json=state["conversation"])
+            body = json.loads(request.content)
+            state["conversation"]["messages"].append(body)
+            return httpx.Response(201, json={"id": "m", **body, "created_at": "x"})
+        return httpx.Response(404, json={"detail": "unhandled", "url": url})
+
+    agent = _make_agent(state, httpx.MockTransport(handler))
+    client = TestClient(create_app(agent=agent))
+    r = client.post("/chat", json={"message": "zweite frage", "conversation_id": "conv-1"})
+    assert r.status_code == 200, r.text
+    llm_bodies = [json.loads(c) for m, u, c in state["requests"] if u.endswith("/chat/completions")]
+    roles = [m["role"] for m in llm_bodies[0]["messages"]]
+    assert roles == ["system", "user", "assistant", "user"]  # orphan tool message dropped
+    assert "tool" not in roles

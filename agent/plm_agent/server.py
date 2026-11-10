@@ -83,14 +83,24 @@ def _sse(event: dict) -> str:
 
 
 def _to_llm_message(m: dict) -> dict:
+    role = m.get("role")
     content = m.get("content") or {}
-    if m["role"] in ("user", "assistant", "system"):
+    if role == "assistant":
+        msg: dict = {
+            "role": "assistant",
+            "content": (content.get("text") or "") if isinstance(content, dict) else str(content),
+        }
+        tool_calls = content.get("tool_calls") if isinstance(content, dict) else None
+        if tool_calls:
+            msg["tool_calls"] = tool_calls
+        return msg
+    if role in ("user", "system"):
         text = content.get("text", "") if isinstance(content, dict) else str(content)
-        return {"role": m["role"], "content": text}
+        return {"role": role, "content": text}
     return {
         "role": "tool",
-        "tool_call_id": content.get("tool_call_id", ""),
-        "content": content.get("content", ""),
+        "tool_call_id": content.get("tool_call_id", "") if isinstance(content, dict) else "",
+        "content": content.get("content", "") if isinstance(content, dict) else str(content),
     }
 
 
@@ -202,7 +212,9 @@ def create_app(
             r.raise_for_status()
             conv = r.json()
         conversation_id = conv["id"]
-        history = [_to_llm_message(m) for m in conv.get("messages", [])]
+        from plm_agent.runner import sanitize_history
+
+        history = sanitize_history([_to_llm_message(m) for m in conv.get("messages", [])])
 
         log = logging.getLogger("plm_agent.chat")
         log.info("chat start conversation=%s message=%r", conversation_id, body.message[:120])
@@ -236,7 +248,15 @@ def create_app(
                         conversation_id,
                         len(done["content"]),
                     )
-                    _add_message(a, conversation_id, "assistant", {"text": done["content"]})
+                    content: dict = {"text": done["content"]}
+                    last_assistant = next(
+                        (m for m in reversed(done["messages"]) if m.get("role") == "assistant"),
+                        None,
+                    )
+                    if last_assistant and last_assistant.get("tool_calls"):
+                        # persist tool_calls so the stored history stays valid for the next turn
+                        content["tool_calls"] = last_assistant["tool_calls"]
+                    _add_message(a, conversation_id, "assistant", content)
             except Exception as e:  # noqa: BLE001 - stream already started: report as SSE error event
                 log.error("chat stream failed: %s: %s", type(e).__name__, e)
                 yield _sse({"type": "error", "message": f"{type(e).__name__}: {e}"})
