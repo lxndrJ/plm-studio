@@ -261,3 +261,25 @@ def test_logs_endpoint_enforces_service_token(monkeypatch):
     client = TestClient(create_app(agent=agent))
     assert client.get("/logs").status_code == 401
     assert client.get("/logs", headers={"X-Agent-Token": "sekret"}).status_code == 200
+
+
+def test_build_agent_uses_openai_base_url_from_env(monkeypatch):
+    """Compose passes OPENAI_BASE_URL through from .env; a direct provider
+    (e.g. Mistral) must end up in llm_url, not the hardcoded litellm default."""
+    from plm_agent.server import build_agent
+
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://api.mistral.ai/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "mstrl-test-only")
+    monkeypatch.setenv("LLM_MODEL", "mistral-large-latest")
+    monkeypatch.setenv("PLM_API_URL", "http://plm.test")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, json={"openapi": "3.1.0", "info": {"title": "t", "version": "1"}, "paths": {}}
+        )
+
+    agent = build_agent(transport=httpx.MockTransport(handler))
+    assert agent.llm_url == "https://api.mistral.ai/v1/chat/completions"
+    assert agent.plm_base_url == "http://plm.test"
+    assert agent.model == "mistral-large-latest"
+    assert agent.api_key == "mstrl-test-only"
