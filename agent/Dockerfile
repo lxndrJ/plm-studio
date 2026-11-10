@@ -6,9 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # package source must be present BEFORE pip install, otherwise the wheel is empty
+# (plm_agent/ includes system_prompt.md as package data)
 COPY agent/pyproject.toml ./agent/pyproject.toml
 COPY agent/plm_agent ./agent/plm_agent
-COPY agent/prompts ./agent/prompts
 RUN pip install --no-cache-dir ./agent
 
 EXPOSE 8001

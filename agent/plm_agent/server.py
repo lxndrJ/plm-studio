@@ -19,13 +19,23 @@ from typing import Annotated
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from plm_agent.runner import PlmAgent
 from plm_agent.toolgen import ToolCatalog, generate
 
 AGENT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def default_system_prompt() -> str:
+    """System prompt shipped as package data (plm_agent/system_prompt.md), so it
+    is present in installed wheels too. Falls back to the legacy source-tree
+    location agent/prompts/system-prompt.md."""
+    packaged = Path(__file__).resolve().parent / "system_prompt.md"
+    if packaged.exists():
+        return packaged.read_text(encoding="utf-8")
+    return (AGENT_ROOT / "prompts" / "system-prompt.md").read_text(encoding="utf-8")
 
 
 class ChatRequest(BaseModel):
@@ -61,7 +71,7 @@ def build_agent(transport: httpx.MockTransport | None = None) -> PlmAgent:
         email=os.environ.get("PLM_AGENT_EMAIL", ""),
         password=os.environ.get("PLM_AGENT_PASSWORD", ""),
         catalog=catalog,
-        system_prompt=(AGENT_ROOT / "prompts" / "system-prompt.md").read_text(encoding="utf-8"),
+        system_prompt=default_system_prompt(),
         transport=transport,
     )
 
@@ -94,7 +104,16 @@ def create_app(
         if state["agent"] is None:
             state["agent"] = (agent_factory or build_agent)()
         if state["agent"]._token is None:
-            state["agent"].login()
+            try:
+                state["agent"].login()
+            except httpx.HTTPStatusError as e:
+                raise HTTPException(
+                    status_code=502,
+                    detail=(
+                        f"agent login against the PLM API failed (HTTP {e.response.status_code}) — "
+                        "check PLM_AGENT_EMAIL/PLM_AGENT_PASSWORD and that the service account exists"
+                    ),
+                ) from e
         return state["agent"]
 
     def check_token(x_agent_token: str | None) -> None:
@@ -106,6 +125,20 @@ def create_app(
             "POST",
             f"/api/v1/agent/conversations/{conversation_id}/messages",
             body={"role": role, "content": content},
+        )
+
+    @app.exception_handler(httpx.HTTPError)
+    async def httpx_error_handler(_request, exc: httpx.HTTPError):
+        return JSONResponse(
+            status_code=502,
+            content={"detail": f"upstream request failed: {exc}", "code": "upstream_error"},
+        )
+
+    @app.exception_handler(OSError)
+    async def os_error_handler(_request, exc: OSError):
+        return JSONResponse(
+            status_code=502,
+            content={"detail": f"upstream unreachable: {exc}", "code": "upstream_unreachable"},
         )
 
     @app.get("/health")
@@ -147,25 +180,28 @@ def create_app(
 
         def stream():
             yield _sse({"type": "conversation", "conversation_id": conversation_id})
-            _add_message(a, conversation_id, "user", {"text": body.message})
-            done = None
-            for event in a.run_events(body.message, history=history):
-                if event["type"] == "tool_call":
-                    _add_message(
-                        a,
-                        conversation_id,
-                        "tool",
-                        {
-                            "tool_call_id": event["call_id"],
-                            "name": event["name"],
-                            "content": json.dumps(event["result"]),
-                        },
-                    )
-                if event["type"] == "done":
-                    done = event
-                yield _sse(event)
-            if done is not None:
-                _add_message(a, conversation_id, "assistant", {"text": done["content"]})
+            try:
+                _add_message(a, conversation_id, "user", {"text": body.message})
+                done = None
+                for event in a.run_events(body.message, history=history):
+                    if event["type"] == "tool_call":
+                        _add_message(
+                            a,
+                            conversation_id,
+                            "tool",
+                            {
+                                "tool_call_id": event["call_id"],
+                                "name": event["name"],
+                                "content": json.dumps(event["result"]),
+                            },
+                        )
+                    if event["type"] == "done":
+                        done = event
+                    yield _sse(event)
+                if done is not None:
+                    _add_message(a, conversation_id, "assistant", {"text": done["content"]})
+            except Exception as e:  # noqa: BLE001 - stream already started: report as SSE error event
+                yield _sse({"type": "error", "message": f"{type(e).__name__}: {e}"})
             yield _sse({"type": "end"})
 
         return StreamingResponse(stream(), media_type="text/event-stream")

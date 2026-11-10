@@ -23,7 +23,9 @@ def main() -> int:
     parser.add_argument("--email", default=os.environ.get("PLM_AGENT_EMAIL", ""))
     parser.add_argument("--password", default=os.environ.get("PLM_AGENT_PASSWORD", ""))
     parser.add_argument("--tools", default=str(AGENT_ROOT / "tools" / "tools.json"))
-    parser.add_argument("--system-prompt", default=str(AGENT_ROOT / "prompts" / "system-prompt.md"))
+    parser.add_argument(
+        "--system-prompt", default=None, help="default: packaged plm_agent/system_prompt.md"
+    )
     parser.add_argument(
         "--service-url",
         default=os.environ.get("AGENT_SERVICE_URL"),
@@ -61,6 +63,13 @@ def main() -> int:
         return 0
 
     catalog = ToolCatalog.from_dict(json.loads(Path(args.tools).read_text(encoding="utf-8")))
+    from plm_agent.server import default_system_prompt
+
+    system_prompt = (
+        Path(args.system_prompt).read_text(encoding="utf-8")
+        if args.system_prompt
+        else default_system_prompt()
+    )
     agent = PlmAgent(
         plm_base_url=args.plm_url,
         llm_base_url=args.llm_url,
@@ -69,7 +78,7 @@ def main() -> int:
         email=args.email,
         password=args.password,
         catalog=catalog,
-        system_prompt=Path(args.system_prompt).read_text(encoding="utf-8"),
+        system_prompt=system_prompt,
     )
     print(agent.run(args.prompt))
     return 0

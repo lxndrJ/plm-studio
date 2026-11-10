@@ -34,6 +34,8 @@ services:
       JWT_ACCESS_MINUTES: ${JWT_ACCESS_MINUTES:-30}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+      PLM_AGENT_EMAIL: ${PLM_AGENT_EMAIL:-}
+      PLM_AGENT_PASSWORD: ${PLM_AGENT_PASSWORD:-}
       STORAGE_DIR: /data/files
     volumes:
       - filedata:/data/files

@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 60
     BOOTSTRAP_ADMIN_EMAIL: str = "admin@example.com"
     BOOTSTRAP_ADMIN_PASSWORD: str = "admin"
+    # optional agent service account (created on startup if set and missing; role editor,
+    # never approver — the agent must not be able to approve its own confirmations)
+    PLM_AGENT_EMAIL: str = ""
+    PLM_AGENT_PASSWORD: str = ""
     STORAGE_DIR: str = "./data/files"
     CONFIRMATION_TTL_HOURS: int = 24
     TYPST_BINARY: str = "typst"
