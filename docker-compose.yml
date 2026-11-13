@@ -55,6 +55,8 @@ services:
       API_PROXY_TARGET: http://api:8000
       AGENT_PROXY_TARGET: http://agent:8001
       PREVIEWS_PROXY_TARGET: http://previews:8002
+      # injected server-side into /agent-api proxy requests (X-Agent-Token), never sent to the browser
+      AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-}
     depends_on:
       api:
         condition: service_started
