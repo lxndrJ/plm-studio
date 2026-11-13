@@ -1,5 +1,5 @@
 import { get } from "svelte/store";
-import { auth } from "$lib/auth";
+import { auth, logout } from "$lib/auth";
 
 export class ApiError extends Error {
   status: number;
@@ -37,6 +37,8 @@ async function reqRaw<T>(
   }
   const res = await fetch(url, { method, headers, body, credentials: "include" });
   if (!res.ok) {
+    // expired/invalid PLM session: drop the stored token so the UI returns to the login screen
+    if (res.status === 401 && base === BASE) logout();
     let detail: any = {};
     try {
       detail = await res.json();

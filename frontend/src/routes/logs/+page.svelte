@@ -22,7 +22,18 @@
     try {
       value = await services.find((s) => s.key === key)!.fetch();
     } catch (e: any) {
-      value = e?.status === 403 ? "403 — nur für Admins" : e?.status === 401 ? "401 — ggf. Token nötig" : `Fehler: ${e?.message}`;
+      if (e?.status === 401) {
+        value =
+          key === "api"
+            ? "401 — Session abgelaufen oder ungültig — bitte neu anmelden"
+            : key === "agent"
+              ? "401 — X-Agent-Token nötig (der UI-Proxy injiziert ihn aus AGENT_SERVICE_TOKEN)"
+              : "401 — nicht autorisiert";
+      } else if (e?.status === 403) {
+        value = "403 — nur für Admins";
+      } else {
+        value = `Fehler: ${e?.message}`;
+      }
     }
     data = { ...data, [key]: value };
   }
