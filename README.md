@@ -115,6 +115,11 @@ always come back as 202 + confirmation token and are approved by the human via
 
 ### Agent service (M10)
 
+What the agent can do (tools generated from `/openapi.json`; writes only as
+proposals that a human approves) is documented in [docs/agent.md](docs/agent.md).
+The `/agent` UI page offers quick-action buttons for standard tasks and a short
+help panel.
+
     docker compose up -d agent        # http://localhost:8001
     curl -N -X POST http://localhost:8001/chat -H 'Content-Type: application/json' \
          -d '{"message": "Suche alle TEST-Teile"}'

@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import { api, type Eco, type Ecr } from "$lib/api/client";
   import Badge from "$lib/components/Badge.svelte";
   import TransitionBar from "$lib/components/TransitionBar.svelte";
 
-  const nr = $page.params.nr ?? "";
-  const isEcr = nr.startsWith("ECR-");
+  // reactive: navigating ECR -> ECO (same route, new param) must reload
+  $: nr = $page.params.nr ?? "";
+  $: isEcr = nr.startsWith("ECR-");
 
   let ecr: Ecr | null = null;
   let eco: Eco | null = null;
@@ -96,7 +96,7 @@
     return new Date(ts).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
   }
 
-  onMount(load);
+  $: if (nr) void load();
 </script>
 
 {#if error}<div class="error">{error}</div>{/if}
