@@ -22,10 +22,9 @@
 
   let openConfirmations = 0;
 
-  function isActive(href: string): boolean {
-    const p = $page.url.pathname;
-    if (href === "/") return p === "/";
-    return p === href || p.startsWith(href + "/");
+  function isActive(href: string, path: string): boolean {
+    if (href === "/") return path === "/";
+    return path === href || path.startsWith(href + "/");
   }
 
   async function refreshStats(): Promise<void> {
@@ -62,7 +61,7 @@
       <nav>
         {#each nav as n}
           {#if !n.adminOnly || $auth.role === "admin"}
-            <a href={n.href} class:active={isActive(n.href)}>
+            <a href={n.href} class:active={isActive(n.href, $page.url.pathname)}>
               <span class="ico">{n.icon}</span>{n.label}
               {#if n.badge && openConfirmations > 0}<span class="nav-badge">{openConfirmations}</span>{/if}
             </a>

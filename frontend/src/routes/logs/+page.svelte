@@ -18,11 +18,13 @@
   let timer: ReturnType<typeof setInterval>;
 
   async function load(key: ServiceKey): Promise<void> {
+    let value: ServiceLogs | string;
     try {
-      data = { ...data, [key]: await services.find((s) => s.key === key)!.fetch() };
+      value = await services.find((s) => s.key === key)!.fetch();
     } catch (e: any) {
-      data = { ...data, [key]: e?.status === 403 ? "403 — nur für Admins" : e?.status === 401 ? "401 — ggf. Token nötig" : `Fehler: ${e?.message}` };
+      value = e?.status === 403 ? "403 — nur für Admins" : e?.status === 401 ? "401 — ggf. Token nötig" : `Fehler: ${e?.message}`;
     }
+    data = { ...data, [key]: value };
   }
 
   async function loadAll(): Promise<void> {
@@ -94,6 +96,8 @@
           <span class="log-logger">{l.logger}</span>
           <span class="log-msg">{l.message}</span>
         </div>
+      {:else}
+        <div class="empty">Keine Log-Zeilen für diesen Service/Filter.</div>
       {/each}
     </div>
   {:else}
