@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import { api, type BomItem, type ClassAttribute, type Part, type PartClass, type WhereUsed } from "$lib/api/client";
   import Badge from "$lib/components/Badge.svelte";
   import TransitionBar from "$lib/components/TransitionBar.svelte";
 
-  const pn = $page.params.pn ?? "";
+  // reactive: navigating part -> part (same route, new param) must reload
+  $: pn = $page.params.pn ?? "";
 
   let part: Part | null = null;
   let bom: BomItem[] = [];
@@ -99,7 +99,7 @@
     return new Date(ts).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
   }
 
-  onMount(load);
+  $: if (pn) void load();
 </script>
 
 {#if error}<div class="error">{error}</div>{/if}
