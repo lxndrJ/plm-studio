@@ -45,7 +45,13 @@ project document "PLM-System Blueprint". Rules for agents:
       (`GET /api/v1/admin/logs` [admin], `GET /agent-api/logs`, `GET /previews-api/logs` —
       Previews-Worker serviert dafür einen Mini-HTTP-Port 8002); `/agent`-Chat zeigt SSE-Error-Events
       als rote Bubbles + aufklappbares Event-Log
-- [ ] Phase 3 (M12+): planned in [docs/phase-3.md](docs/phase-3.md)
+- [x] M14 (Phase-3 start): full-text search over parts/documents — Postgres
+      `to_tsvector`/`plainto_tsquery` + GIN expression indexes (migration 0006),
+      ILIKE fallback on SQLite; `query` param on `GET /parts` and `GET /documents`
+      now also matches description/title with AND-per-word semantics. BOM-diff PDF
+      report (`bom_diff_v1`, Typst): `POST /api/v1/reports/parts/{pn}/bom-diff?rev_a&rev_b`
+      (both revisions must be released), button on the `/bom` page
+- [ ] Phase 3 (M12+): planned in [docs/phase-3.md](docs/phase-3.md) — M12, M13, M15, M16 open
 
 ## Quickstart
 

@@ -89,6 +89,8 @@ class CreateReportPayload(BaseModel):
     template: str = "part_sheet_v1"
     part_number: str | None = None
     ecr_number: str | None = None
+    rev_a: str | None = None
+    rev_b: str | None = None
     reason: str | None = None
 
 

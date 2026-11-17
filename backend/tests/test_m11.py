@@ -5,20 +5,7 @@ import csv
 import io
 import json
 
-import pytest
-
-from app.core.config import get_settings
 from tests.conftest import create_part, release_part
-
-
-@pytest.fixture()
-def fake_typst(tmp_path, monkeypatch):
-    script = tmp_path / "typst"
-    script.write_text('#!/bin/sh\nprintf "%%PDF-1.4 fake-typst" > "$3"\n')
-    script.chmod(0o755)
-    monkeypatch.setattr(get_settings(), "TYPST_BINARY", str(script))
-    return script
-
 
 # --- GET /parts: pagination + filters ---------------------------------------
 

@@ -339,6 +339,11 @@ export const api = {
     }),
   createBomReport: (pn: string, reason?: string) =>
     req<Report>("POST", `/reports/parts/${encodeURIComponent(pn)}/bom?direct=true`, { body: { reason } }),
+  createBomDiffReport: (pn: string, revA: string, revB: string, reason?: string) =>
+    req<Report>("POST", `/reports/parts/${encodeURIComponent(pn)}/bom-diff?direct=true`, {
+      params: { rev_a: revA, rev_b: revB },
+      body: { reason },
+    }),
   createEcrReport: (nr: string, reason?: string) =>
     req<Report>("POST", `/reports/ecrs/${encodeURIComponent(nr)}?direct=true`, { body: { reason } }),
 };

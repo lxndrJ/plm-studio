@@ -55,34 +55,56 @@ def get_document(db: Session, doc_number: str) -> Document:
 
 
 def list_documents(db: Session, query: str | None = None, limit: int = 50) -> list[Document]:
-    stmt = select(Document).order_by(Document.doc_number).limit(limit)
+    from app.services.search import fts_condition, fts_rank
+
+    columns = [Document.doc_number, Document.title]
+    stmt = select(Document)
     if query:
-        like = f"%{query}%"
-        stmt = stmt.where((Document.doc_number.ilike(like)) | (Document.title.ilike(like)))
+        # M14: full-text search over doc number and title
+        cond = fts_condition(db, columns, query)
+        if cond is not None:
+            stmt = stmt.where(cond)
+        rank = fts_rank(db, columns, query)
+        stmt = stmt.order_by(
+            rank.desc() if rank is not None else Document.doc_number, Document.doc_number
+        )
+    else:
+        stmt = stmt.order_by(Document.doc_number)
+    stmt = stmt.limit(limit)
     return list(db.execute(stmt).scalars())
 
 
 def get_revision(db: Session, doc: Document, revision: str) -> DocRevision:
     rev = db.execute(
-        select(DocRevision).where(DocRevision.document_id == doc.id, DocRevision.revision == revision)
+        select(DocRevision).where(
+            DocRevision.document_id == doc.id, DocRevision.revision == revision
+        )
     ).scalar_one_or_none()
     if rev is None:
         raise NotFoundError(
-            f"revision '{revision}' of document '{doc.doc_number}' not found", code="revision_not_found"
+            f"revision '{revision}' of document '{doc.doc_number}' not found",
+            code="revision_not_found",
         )
     return rev
 
 
 def latest_revision(db: Session, doc_id) -> DocRevision | None:
     return db.execute(
-        select(DocRevision).where(DocRevision.document_id == doc_id).order_by(DocRevision.revision.desc()).limit(1)
+        select(DocRevision)
+        .where(DocRevision.document_id == doc_id)
+        .order_by(DocRevision.revision.desc())
+        .limit(1)
     ).scalar_one_or_none()
 
 
-def create_doc_revision(db: Session, *, user: User, doc: Document, change_reason: str) -> DocRevision:
+def create_doc_revision(
+    db: Session, *, user: User, doc: Document, change_reason: str
+) -> DocRevision:
     label = next_revision_label(db, doc.id)
     previous = latest_revision(db, doc.id)
-    rev = DocRevision(document_id=doc.id, revision=label, status="draft", change_reason=change_reason)
+    rev = DocRevision(
+        document_id=doc.id, revision=label, status="draft", change_reason=change_reason
+    )
     db.add(rev)
     db.flush()
     if previous is not None:
@@ -115,12 +137,18 @@ def create_doc_revision(db: Session, *, user: User, doc: Document, change_reason
     return rev
 
 
-def link_document(db: Session, *, user: User, doc: Document, part_number: str, link_type: str) -> DocLink:
+def link_document(
+    db: Session, *, user: User, doc: Document, part_number: str, link_type: str
+) -> DocLink:
     part = db.execute(select(Part).where(Part.part_number == part_number)).scalar_one_or_none()
     if part is None:
         raise NotFoundError(f"part '{part_number}' not found", code="part_not_found")
     existing = db.execute(
-        select(DocLink).where(DocLink.document_id == doc.id, DocLink.part_id == part.id, DocLink.link_type == link_type)
+        select(DocLink).where(
+            DocLink.document_id == doc.id,
+            DocLink.part_id == part.id,
+            DocLink.link_type == link_type,
+        )
     ).scalar_one_or_none()
     if existing:
         raise ConflictError("link already exists", code="link_exists")
@@ -132,7 +160,11 @@ def link_document(db: Session, *, user: User, doc: Document, part_number: str, l
         entity_id=link.id,
         action="create",
         user_id=user.id,
-        new_values={"doc_number": doc.doc_number, "part_number": part_number, "link_type": link_type},
+        new_values={
+            "doc_number": doc.doc_number,
+            "part_number": part_number,
+            "link_type": link_type,
+        },
     )
     db.commit()
     db.refresh(link)
@@ -196,7 +228,9 @@ def get_file(db: Session, file_id) -> DocFile:
     return f
 
 
-def transition_doc_revision(db: Session, *, user: User, rev: DocRevision, to_status: str, reason: str) -> DocRevision:
+def transition_doc_revision(
+    db: Session, *, user: User, rev: DocRevision, to_status: str, reason: str
+) -> DocRevision:
     from app.services.workflow import assert_transition_allowed
 
     assert_transition_allowed(

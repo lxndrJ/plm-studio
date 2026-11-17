@@ -93,6 +93,41 @@ def create_bom_report(
     )
 
 
+@router.post("/parts/{part_number}/bom-diff", status_code=201, response_model=ReportDetail)
+def create_bom_diff_report(
+    part_number: str,
+    rev_a: Annotated[str, Query()],
+    rev_b: Annotated[str, Query()],
+    body: ReportCreate,
+    db: DbSession,
+    user: Annotated[User, Depends(require_editor)],
+    direct: Annotated[bool, Query()] = False,
+):
+    """M14: BOM comparison report (bom_diff_v1) between two revisions.
+    Both revisions must be released — reports contain released content only."""
+    if not direct:
+        return _propose_report(
+            db,
+            user,
+            action_payload={
+                "template": report_service.TEMPLATE_BOM_DIFF,
+                "part_number": part_number,
+                "rev_a": rev_a,
+                "rev_b": rev_b,
+                "reason": body.reason,
+            },
+            summary=(
+                f"create BOM diff report (bom_diff_v1) for '{part_number}' "
+                f"rev {rev_a} vs {rev_b} (released content only)"
+            ),
+        )
+    return _detail(
+        report_service.create_bom_diff_report(
+            db, user=user, part_number=part_number, rev_a=rev_a, rev_b=rev_b, reason=body.reason
+        )
+    )
+
+
 @router.post("/ecrs/{ecr_number}", status_code=201, response_model=ReportDetail)
 def create_ecr_report(
     ecr_number: str,

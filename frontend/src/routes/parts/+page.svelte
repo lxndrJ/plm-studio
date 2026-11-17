@@ -158,7 +158,7 @@
 
 <div class="card">
   <div class="toolbar">
-    <input class="input" style="max-width: 280px" placeholder="Suche (Nummer, Name) …" bind:value={query} on:input={onSearch} />
+    <input class="input" style="max-width: 300px" placeholder="Suche (Nummer, Name, Beschreibung) …" bind:value={query} on:input={onSearch} />
     <select class="select" style="max-width: 200px" bind:value={classCode} on:change={() => { page = 1; load(); }}>
       <option value="">Alle Klassen</option>
       {#each classes as c}<option value={c.code}>{c.code} — {c.name}</option>{/each}

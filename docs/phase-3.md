@@ -16,6 +16,11 @@ Blueprint"; this plan is derived from the repository state.
 | M15 | Import & batch: CSV/XLSX import for parts + BOMs, bulk changes via ECO | Export exists since M11 (`/export/*`), but the seeder only creates TEST data — there is no import path for real data |
 | M16 | Agent hardening: scheduled/triggered runs (Mistral Workflows), evaluations of the agent loop, RAG over the document corpus | The agent (M7/M10/M11) is a service with chat UI but so far interactive only (one prompt = one run) |
 
+Status: **M14 is implemented** (FTS search over parts/documents via Postgres
+tsvector + migration 0006, ILIKE fallback on SQLite; BOM-diff PDF report
+`bom_diff_v1` via `POST /api/v1/reports/parts/{pn}/bom-diff`). M12, M13, M15,
+M16 remain open.
+
 ## Optional backlog (after M16)
 
 - SSO/OIDC instead of JWT-only auth

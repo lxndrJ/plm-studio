@@ -18,12 +18,13 @@ from app.models.part import PartRevision
 from app.models.report import ReportExport
 from app.models.user import User
 from app.services import audit as audit_service
-from app.services.bom_service import get_bom, get_part_by_number
+from app.services.bom_service import bom_diff, get_bom, get_part_by_number
 from app.services.numbering import allocate_number
 
 TEMPLATE_PART_SHEET = "part_sheet_v1"
 TEMPLATE_BOM_EXPLOSION = "bom_explosion_v1"
 TEMPLATE_ECR = "ecr_v1"
+TEMPLATE_BOM_DIFF = "bom_diff_v1"
 
 INTERNAL_ATTRIBUTE_KEYS = {
     "preis",
@@ -171,6 +172,41 @@ def build_ecr_snapshot(db: Session, *, report_id: str, ecr_number: str) -> dict:
     }
 
 
+def build_bom_diff_snapshot(
+    db: Session, *, report_id: str, part_number: str, rev_a: str, rev_b: str
+) -> dict:
+    """BOM diff between two revisions. Reports contain released content only
+    (api-contract rule 12), so both revisions must be released."""
+    part = get_part_by_number(db, part_number)
+    for label in (rev_a, rev_b):
+        rev = db.execute(
+            select(PartRevision).where(
+                PartRevision.part_id == part.id, PartRevision.revision == label
+            )
+        ).scalar_one_or_none()
+        if rev is None:
+            raise NotFoundError(
+                f"revision '{label}' of part '{part_number}' not found", code="revision_not_found"
+            )
+        if rev.status != "released":
+            raise ConflictError(
+                f"revision '{label}' of part '{part_number}' is '{rev.status}', not released; "
+                "reports only contain released content",
+                code="no_released_revision",
+            )
+    diff = bom_diff(db, part_number, rev_a, rev_b)
+    return {
+        "report_id": report_id,
+        "template": TEMPLATE_BOM_DIFF,
+        "part_number": part_number,
+        "rev_a": rev_a,
+        "rev_b": rev_b,
+        "added": diff["added"],
+        "removed": diff["removed"],
+        "changed": diff["changed"],
+    }
+
+
 def _esc(value) -> str:
     return (
         str(value).replace("\\", "\\\\").replace('"', '\\"').replace("[", "\\[").replace("]", "\\]")
@@ -235,11 +271,64 @@ Report {_esc(snapshot['report_id'])} (template {_esc(snapshot['template'])}), St
 """
 
 
+def _typst_bom_diff(snapshot: dict) -> str:
+    def rows(entries, qty) -> str:
+        return (
+            "\n".join(
+                f"[{_esc(e['component'])}], [{qty(e)}], [{_esc(str(e.get('position', '')))}],"
+                for e in entries
+            )
+            or "[\u2014], [\u2014], [\u2014],"
+        )
+
+    added_rows = rows(snapshot["added"], lambda e: f"{e['quantity']} {e['unit']}")
+    removed_rows = rows(snapshot["removed"], lambda e: f"{e['quantity']} {e['unit']}")
+    changed_rows = (
+        "\n".join(
+            f"[{_esc(c['component'])}], "
+            f"[{c['from']['quantity']} \u2192 {c['to']['quantity']}], "
+            f"[{_esc(str(c['from'].get('position', '')))} \u2192 {_esc(str(c['to'].get('position', '')))}],"
+            for c in snapshot["changed"]
+        )
+        or "[\u2014], [\u2014], [\u2014],"
+    )
+    return f"""#set page(paper: "a4", margin: 2cm)
+#set text(font: "DejaVu Sans", size: 11pt)
+
+#text(size: 18pt, weight: "bold")[BOM-Vergleich {_esc(snapshot['part_number'])}: Rev {_esc(snapshot['rev_a'])} \u2192 {_esc(snapshot['rev_b'])}]
+
+Report {_esc(snapshot['report_id'])} (template {_esc(snapshot['template'])}), nur freigegebene (released) Revisionen
+
+== Hinzugef\u00fcgt ({len(snapshot['added'])})
+#table(
+  columns: 3,
+  table.header([Komponente], [Menge], [Pos]),
+{added_rows}
+)
+
+== Entfernt ({len(snapshot['removed'])})
+#table(
+  columns: 3,
+  table.header([Komponente], [Menge], [Pos]),
+{removed_rows}
+)
+
+== Ge\u00e4ndert ({len(snapshot['changed'])})
+#table(
+  columns: 3,
+  table.header([Komponente], [Menge], [Pos]),
+{changed_rows}
+)
+"""
+
+
 def _typst_document(snapshot: dict) -> str:
     if snapshot["template"] == TEMPLATE_BOM_EXPLOSION:
         return _typst_bom(snapshot)
     if snapshot["template"] == TEMPLATE_ECR:
         return _typst_ecr(snapshot)
+    if snapshot["template"] == TEMPLATE_BOM_DIFF:
+        return _typst_bom_diff(snapshot)
     return _typst_part_sheet(snapshot)
 
 
@@ -384,6 +473,29 @@ def create_ecr_report(
     )
 
 
+def create_bom_diff_report(
+    db: Session,
+    *,
+    user: User,
+    part_number: str,
+    rev_a: str,
+    rev_b: str,
+    reason: str | None = None,
+) -> ReportExport:
+    report_id = allocate_number(db, "RPT")
+    snapshot = build_bom_diff_snapshot(
+        db, report_id=report_id, part_number=part_number, rev_a=rev_a, rev_b=rev_b
+    )
+    return _create(
+        db,
+        user=user,
+        template=TEMPLATE_BOM_DIFF,
+        snapshot=snapshot,
+        reason=reason,
+        subject={"part_number": part_number, "rev_a": rev_a, "rev_b": rev_b},
+    )
+
+
 def create_report_for(db: Session, *, user: User, template: str, payload) -> ReportExport:
     """Dispatch for the confirmation-token replay (action create_report)."""
     from app.core.errors import ValidationError
@@ -405,6 +517,19 @@ def create_report_for(db: Session, *, user: User, template: str, payload) -> Rep
             raise ValidationError("ecr_number required for ecr_v1", code="invalid_payload")
         return create_ecr_report(
             db, user=user, ecr_number=payload.ecr_number, reason=payload.reason
+        )
+    if template == TEMPLATE_BOM_DIFF:
+        if not (payload.part_number and payload.rev_a and payload.rev_b):
+            raise ValidationError(
+                "part_number, rev_a and rev_b required for bom_diff_v1", code="invalid_payload"
+            )
+        return create_bom_diff_report(
+            db,
+            user=user,
+            part_number=payload.part_number,
+            rev_a=payload.rev_a,
+            rev_b=payload.rev_b,
+            reason=payload.reason,
         )
     raise ValidationError(f"unknown report template '{template}'", code="unknown_template")
 

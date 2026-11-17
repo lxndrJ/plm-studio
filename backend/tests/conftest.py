@@ -51,6 +51,18 @@ def client():
 
 
 @pytest.fixture()
+def fake_typst(tmp_path, monkeypatch):
+    """Fake typst binary: writes a dummy PDF so report rendering works in tests."""
+    from app.core.config import get_settings
+
+    script = tmp_path / "typst"
+    script.write_text('#!/bin/sh\nprintf "%%PDF-1.4 fake-typst" > "$3"\n')
+    script.chmod(0o755)
+    monkeypatch.setattr(get_settings(), "TYPST_BINARY", str(script))
+    return script
+
+
+@pytest.fixture()
 def db():
     session = SessionLocal()
     try:

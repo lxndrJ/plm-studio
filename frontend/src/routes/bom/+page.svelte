@@ -11,6 +11,7 @@
   let revA = "";
   let revB = "";
   let error = "";
+  let notice = "";
 
   async function search(): Promise<void> {
     error = "";
@@ -41,6 +42,21 @@
       error = e?.message;
     }
   }
+
+  async function createDiffReport(): Promise<void> {
+    if (!part) return;
+    error = "";
+    notice = "";
+    try {
+      const r = await api.createBomDiffReport(part.part_number, revA, revB, `BOM-Vergleich ${revA} vs ${revB}`);
+      notice = `${r.report_id} (bom_diff_v1) erstellt — Download unter „Reports“. PDF: ${r.pdf_available ? "ja" : "nein"}.`;
+    } catch (e: any) {
+      error =
+        e?.code === "no_released_revision"
+          ? "Nur freigegebene (released) Revisionen dürfen in Reports — beide Revs müssen released sein."
+          : e?.message;
+    }
+  }
 </script>
 
 <div class="page-head">
@@ -51,6 +67,7 @@
 </div>
 
 {#if error}<div class="error">{error}</div>{/if}
+{#if notice}<div class="notice">{notice}</div>{/if}
 
 <div class="card" style="margin-bottom: 14px">
   <div class="toolbar">
@@ -113,6 +130,7 @@
         {#each part.revisions as r}<option value={r.revision}>Rev {r.revision}</option>{/each}
       </select>
       <button class="btn btn-ghost btn-sm" on:click={doDiff}>Vergleichen</button>
+      <button class="btn btn-primary btn-sm" on:click={createDiffReport} disabled={!revA || !revB}>Diff-Report (PDF)</button>
     </div>
     {#if diff}
       <div class="grid2">

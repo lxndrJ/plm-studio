@@ -8,6 +8,7 @@ from app.models.user import User
 from app.services import audit as audit_service
 from app.services.attributes import validate_attributes
 from app.services.numbering import allocate_number, find_duplicate_candidates, next_revision_label
+from app.services.search import fts_condition, fts_rank
 
 
 def create_part(
@@ -214,8 +215,11 @@ def _filtered_parts(
 ):
     stmt = select(Part)
     if query:
-        like = f"%{query}%"
-        stmt = stmt.where((Part.part_number.ilike(like)) | (Part.name.ilike(like)))
+        # M14: full-text search over number, name and description (FTS on
+        # PostgreSQL, ILIKE fallback elsewhere)
+        cond = fts_condition(db, [Part.part_number, Part.name, Part.description], query)
+        if cond is not None:
+            stmt = stmt.where(cond)
     if class_code:
         stmt = stmt.where(Part.class_id.in_(_class_subtree_ids(db, class_code)))
     if part_type:
@@ -261,7 +265,13 @@ def search_parts(
     limit: int = 50,
     offset: int = 0,
 ) -> list[Part]:
-    stmt = _filtered_parts(db, query, class_code, part_type, status).order_by(Part.part_number)
+    stmt = _filtered_parts(db, query, class_code, part_type, status)
+    order = [Part.part_number]
+    if query:
+        rank = fts_rank(db, [Part.part_number, Part.name, Part.description], query)
+        if rank is not None:
+            order = [rank.desc(), Part.part_number]
+    stmt = stmt.order_by(*order)
     return list(db.execute(stmt.limit(limit).offset(offset)).scalars())
 
 
